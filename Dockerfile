@@ -42,6 +42,8 @@ COPY proof.pdf ./
 COPY eng.traineddata ./
 COPY files/statement.pdf ./files/
 COPY files/helvetica-light.ttf ./files/
+COPY files/tymebank/input.pdf ./files/tymebank/
+COPY files/tymebank/input2.pdf ./files/tymebank/
 
 # Install TypeScript and build dependencies
 RUN npm install -g typescript
