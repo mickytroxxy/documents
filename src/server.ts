@@ -8,10 +8,6 @@ import routes from './routes';
 import path from 'path';
 import cors from 'cors';
 import { corsHandler } from './helpers/corsHandler';
-import { getSecretKeys } from './helpers/api';
-import { generateTymeBankPDF } from './handlers/tymebank';
-import { tymeBankSample } from './handlers/tymebank/sample';
-import { mkdirp } from 'mkdirp';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -39,10 +35,6 @@ export const Main = () => {
 
     httpServer.listen(server.SERVER_PORT, async () => {
         console.log(`Server started on ${server.SERVER_HOSTNAME}:${server.SERVER_PORT}`);
-        const res = await getSecretKeys();
-        if (res?.length > 0) {
-            secrets = res?.[0];
-        }
     });
 };
 
