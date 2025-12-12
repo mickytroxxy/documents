@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 app.use(cors());
 
 export let secrets = {
-    BASE_URL: 'https://mrdocs-server-225250995708.europe-west1.run.app/api',
+    BASE_URL: 'https://documents-225250995708.europe-west1.run.app/api',
     DEEP_SEEK_API: ''
 };
 
