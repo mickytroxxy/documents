@@ -15,7 +15,7 @@ export let httpServer: ReturnType<typeof http.createServer>;
 app.use(upload());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-app.use(cors());
+// Remove default cors() to use our custom handler
 
 export let secrets = {
     BASE_URL: 'https://documents-225250995708.europe-west1.run.app/api',
@@ -27,9 +27,11 @@ export const Main = () => {
     const filesPath = path.join(__dirname, '..', 'files');
     app.use('/api', express.static(filesPath));
 
+    // Apply CORS handler before routes to intercept all requests
+    app.use(corsHandler);
+
     app.use(express.json());
     app.use('/api', routes);
-    app.use(corsHandler);
 
     httpServer = http.createServer(app);
 
