@@ -46,6 +46,11 @@ COPY files/fonts/ ./files/fonts/
 COPY files/tymebank/input.pdf ./files/tymebank/
 COPY files/tymebank/input2.pdf ./files/tymebank/
 
+# Normalize font filename casing to match runtime expectations
+RUN if [ -f "./files/fonts/arial-Bold.ttf" ] && [ ! -f "./files/fonts/Arial-Bold.ttf" ]; then \
+      mv ./files/fonts/arial-Bold.ttf ./files/fonts/Arial-Bold.ttf; \
+    fi
+
 # Install TypeScript and build dependencies
 RUN npm install -g typescript
 RUN npm install --save-dev typescript @types/node
