@@ -184,12 +184,12 @@ export const handleDocumentGeneration = async ({
         let statementDetails: StatementData | { statements: any[]; rawData: any } | TymeBankStatement[];
 
         // Check if this is TymeBank data (array of statements) or Standard Bank data (single statement)
-        if (bankType === 'tymebank') {
+        if (bankType === 'TYMEBANK') {
             // For TymeBank, we need to create a raw data structure that generateBankStatement can handle
             statementDetails = {
                 statements: financialData.data.statements,
                 rawData: {
-                    bankType: 'tymebank',
+                    bankType: 'TYMEBANK',
                     accountHolder: accountHolderWithTitle,
                     accountNumber: accountNumber
                 }
@@ -203,7 +203,8 @@ export const handleDocumentGeneration = async ({
             statementDetails,
             payslipData,
             availableBalance,
-            bankType: bankType as BankType
+            bankType: bankType?.toUpperCase() as BankType,
+            openBalance
         });
         return results;
     } else {

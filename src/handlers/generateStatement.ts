@@ -38,7 +38,7 @@ export const generateBankStatement = async ({
             const accountFolder = `./files/${accountNumber}`;
             mkdirp.sync(accountFolder);
 
-            if (aiBankType === 'tymebank') {
+            if (aiBankType === 'TYMEBANK') {
                 // Process each TymeBank statement separately and create individual PDF files
                 const today = new Date();
                 statementFiles = [];
@@ -67,7 +67,11 @@ export const generateBankStatement = async ({
                     const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
 
                     console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
-                    await generateTymeBankPDF(individualStatement, monthOutputPath);
+                    await generateTymeBankPDF(individualStatement, monthOutputPath, {
+                        includeLegalText: i === rawData.statements.length - 1,
+                        includeClosingBorder: i === rawData.statements.length - 1,
+                        includeClosingRow: i === rawData.statements.length - 1
+                    });
                     console.log(`Successfully generated PDF at ${monthOutputPath}`);
 
                     // Check if file actually exists
@@ -115,7 +119,11 @@ export const generateBankStatement = async ({
                     const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
 
                     console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
-                    await generateTymeBankPDF(statement, monthOutputPath);
+                    await generateTymeBankPDF(statement, monthOutputPath, {
+                        includeLegalText: i === processedStatements.length - 1,
+                        includeClosingBorder: i === processedStatements.length - 1,
+                        includeClosingRow: i === processedStatements.length - 1
+                    });
                     console.log(`Successfully generated PDF at ${monthOutputPath}`);
 
                     // Check if file actually exists
@@ -142,12 +150,16 @@ export const generateBankStatement = async ({
             const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
 
             if (bankType === 'STANDARD') {
-                const data = rebalanceStatement(processedStatements as StatementData, availableBalance);
+                const data = rebalanceStatement(processedStatements as StatementData, availableBalance, openBalance);
                 statementPath = await generateStandardBankStatement(outputFilePath, data);
             } else if (!Array.isArray(processedStatements)) {
                 // Safe type check before casting
                 const tymeStatement = processedStatements as unknown as TymeBankStatement;
-                statementPath = await generateTymeBankPDF(tymeStatement, outputFilePath);
+                statementPath = await generateTymeBankPDF(tymeStatement, outputFilePath, {
+                    includeLegalText: true,
+                    includeClosingBorder: true,
+                    includeClosingRow: true
+                });
             }
         }
 

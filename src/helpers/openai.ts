@@ -99,7 +99,7 @@ const parseJSONResponse = (content: string): any => {
     }
 };
 
-export type BankType = 'standard' | 'tymebank' | 'FNB' | 'NEDBANK' | 'CAPITEC' | 'STANDARD' | 'ABSA';
+export type BankType = 'TYMEBANK' | 'FNB' | 'NEDBANK' | 'CAPITEC' | 'STANDARD' | 'ABSA';
 
 export interface GenerateDocs {
     accountHolder: string;
@@ -159,12 +159,12 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
         };
 
         const systemMessage =
-            bankType === 'tymebank'
+            bankType === 'TYMEBANK'
                 ? 'You are a financial data generator for TymeBank. Generate realistic South African bank statement data in valid JSON format only.'
                 : 'You are a financial data generator. Generate realistic South African bank statement data in valid JSON format only.';
 
         // Generate AI data based on bank type
-        if (bankType === 'tymebank') {
+        if (bankType === 'TYMEBANK') {
             // For TymeBank, generate data for multiple months
             const statements: any[] = [];
             const today = new Date();
@@ -272,7 +272,7 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                     message: `Generated AI data for ${statements.length} TymeBank statements`,
                     data: {
                         statements: statements,
-                        rawData: { bankType: 'tymebank', accountHolder, accountNumber }
+                        rawData: { bankType: 'TYMEBANK', accountHolder, accountNumber }
                     }
                 };
             } else {
@@ -312,7 +312,7 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                 message: 'Generated AI data for standard bank statement',
                 data: {
                     statements: [responseData],
-                    rawData: { bankType: 'standard', accountHolder, accountNumber }
+                    rawData: { bankType: 'STANDARD', accountHolder, accountNumber }
                 }
             };
         }

@@ -23,16 +23,26 @@ export const formStatementPrompt = ({
     salaryAmount = 0,
     averageMonthlySpending = 8000
 }: FormStatementPrompt) => {
-    // core totals (numbers only — no currency symbol)
+    /**
+     * =========================
+     * CORE CALCULATIONS
+     * =========================
+     */
+
+    // Total money leaving the account
     const totalPayments = averageMonthlySpending * months;
+
+    /**
+     * NON-NEGOTIABLE BALANCE LAW
+     * openingBalance + totalDeposits - totalPayments = availableBalance
+     */
     const totalDeposits = availableBalance - openBalance + totalPayments;
+
     const salaryTotal = salaryAmount * months;
     const otherDepositsNeeded = totalDeposits - salaryTotal;
 
-    // Number of transactions to request
     const transactionCount = 30 + months * 10;
 
-    // Get current date for reference
     const currentDate = new Date();
     const currentDateStr = currentDate.toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -40,72 +50,216 @@ export const formStatementPrompt = ({
         year: 'numeric'
     });
 
-    // compact prompt (numbers without "R")
-    return `You are a financial-data generator for South African bank statements. Produce realistic, chronological, and mathematically perfect statement JSON that matches the structure in sampleStatementData.
+    return `
+You are a South African bank-statement generator.
+Your output MUST be mathematically perfect, internally consistent,
+and suitable for loan approval.
 
-IMPORTANT: Current date is ${currentDateStr}. All dates in the statement MUST be on or before this date. NO FUTURE DATES ALLOWED.
+================================================================
+ABSOLUTE DATE CONSTRAINT (HARD RULE)
+================================================================
+Current date: ${currentDateStr}
 
-Keep these required facts (numbers only — DO NOT include currency symbols):
-- accountHolder: "${accountHolder}"
-- accountNumber: "${accountNumber}"
-- periodMonths: ${months}
-- openingBalance: ${openBalance.toFixed(2)}
-- availableBalance should always amount to: ${availableBalance.toFixed(
-        2
-    )}. so make sure that your deposits and payments will leave the ${availableBalance}. This is very import. Don't subtract payments from deposits
-- totalPayments (sum of payment amounts) MUST equal: ${totalPayments.toFixed(2)}
-- totalDeposits (sum of deposit amounts) MUST equal: ${totalDeposits.toFixed(2)}
-- salaryTotal (salaryAmount * months): ${salaryTotal.toFixed(2)}
-- otherDepositsNeeded: ${otherDepositsNeeded.toFixed(2)}
-FINAL CHECK: openingBalance + totalDeposits - totalPayments MUST EQUAL requiredFinalBalance.
+• ALL transaction dates MUST be on or before this date
+• NO future dates
+• Violating this rule INVALIDATES the output
 
-Dates and format:
-- Use date format "DD MMM YY" (e.g. "27 Nov 25")
-- Cover the last ${months} months, absolutely NO future dates (dates must be on or before ${currentDateStr}), chronological order
-- Salary deposits occur on day ${payDate} of each month (if salaryAmount > 0)
+================================================================
+ACCOUNT FACTS (DO NOT CHANGE)
+================================================================
+accountHolder: "${accountHolder}"
+accountNumber: "${accountNumber}"
+periodMonths: ${months}
+openingBalance: ${openBalance.toFixed(2)}
 
-Transaction rules:
-- For deposits use the "deposit" field (positive numbers). For payments use the "payment" field (positive numbers for amounts but treated as debits); balances must update after each entry.
-- Include these minimum counts:
-  - Salary deposits: ${months}
-  - Grocery purchases: ${months * 3}
-  - Fuel purchases: ${months * 2}
-  - ATM withdrawals: ${months}
-  - Utility payments: ${months}
-  - Entertainment: ${Math.floor(months * 1.5)}
-  - Bank fees: ${months * 2}
-  - Transfers: ${Math.floor(months * 0.5)}
+REQUIRED FINAL availableBalance (MUST MATCH EXACTLY):
+${availableBalance.toFixed(2)}
 
-Amounts must be realistic (examples, ranges):
-- Groceries: 200–1500
-- Fuel: 300–800
-- Utilities: 500–2000
-- Telecoms: 100–500
-- Entertainment: 100–1000
-- Retail: 150–3000
-- Dining: 80–500
-- Transfers: 200–5000
-- ATM withdrawals: 200–2000
-- Bank fees: 3.20–65.00
+================================================================
+BALANCE INVARIANT (CRITICAL — DO NOT VIOLATE)
+================================================================
+openingBalance + totalDeposits - totalPayments = availableBalance
 
-Balance algorithm (enforce):
-- currentBalance = openingBalance
-- For each transaction in chronological order:
-  - if deposit: currentBalance += deposit
-  - if payment: currentBalance -= payment
-  - set transaction.balance = currentBalance
-- After all transactions, final currentBalance MUST equal requiredFinalBalance
+Use these EXACT totals:
+• totalPayments: ${totalPayments.toFixed(2)}
+• totalDeposits: ${totalDeposits.toFixed(2)}
+• salaryTotal: ${salaryTotal.toFixed(2)}
+• otherDepositsNeeded: ${otherDepositsNeeded.toFixed(2)}
 
-Additional requirements:
-- Generate exactly ${transactionCount} transactions that satisfy all rules above.
-- Use consistent decimals (two decimal places).
-- RETURN ONLY valid JSON exactly matching the structure of sampleStatementData. No extra text, no explanations.
-- Do not include currency symbols in numeric fields.
-- Create also lots of deposits. don't just create payments transactions only
-Structure reference (use identical keys and nesting as sampleStatementData): ${JSON.stringify(sampleStatementData, null, 2)}
+🚫 YOU ARE STRICTLY FORBIDDEN FROM:
+• Making any payment that exceeds the CURRENT balance
+• Allowing the balance to go negative at ANY point
+• Creating a transaction that would cause insufficient funds
 
-IMPORTANT: Validate all sums and the final balance before returning.`;
+THIS IS A HARD FAILURE CONDITION.
+If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
+
+================================================================
+DATE & SALARY RULES
+================================================================
+• Date format: "DD MMM YY"
+• Cover EXACTLY the last ${months} months
+• Salary deposits occur on day ${payDate} of each month (if salaryAmount > 0)
+
+================================================================
+MONTHLY PAYMENT WINDOW (VERY IMPORTANT)
+================================================================
+Most recurring monthly payments MUST occur between:
+• 25th of the current month
+• and 5th of the following month
+
+This applies to:
+• Rent
+• Utilities
+• Subscriptions
+• Insurance-like payments
+
+Payments outside this window should be occasional only.
+
+================================================================
+RENT (STRICTLY ENFORCED)
+================================================================
+Rent is MONEY LEAVING the account.
+
+mainDescription examples:
+• "MONTHLY RENTAL"
+• "RENTAL PAYMENT"
+
+subDescription MUST ALWAYS BE:
+"PAYMENT TO"
+
+Rules:
+• Occurs between the 1st and 3rd of each month
+• Amount range: 4000–12000
+• SAME amount every month
+• NEVER mark rent as income
+• NEVER use "RENTAL INCOME"
+
+================================================================
+CARD PURCHASE CLASSIFICATION (MANDATORY)
+================================================================
+
+LOCAL CARD PURCHASE (garage, shop, POS):
+subDescription:
+"DEBIT CARD PURCHASE FROM"
+
+LOCAL ONLINE PURCHASE (Takealot, local ecommerce):
+subDescription:
+"DEBIT CARD PURCHASE"
+
+INTERNATIONAL CARD PURCHASE (Google, Facebook, Amazon, Apple, Meta):
+subDescription:
+"INT DEBIT CARD PURCHASE"
+
+FOR EVERY INTERNATIONAL CARD PURCHASE:
+1️⃣ Create the purchase transaction
+2️⃣ IMMEDIATELY AFTER create a FEE transaction:
+
+payment: 11.83
+mainDescription: "FEE: INTERNATIONAL TRANSACTION"
+subDescription: "FEE: INTERNATIONAL TRANSACTION"
+
+================================================================
+ATM CASH & FEES (CRITICAL)
+================================================================
+
+ATM CASH DEPOSIT:
+mainDescription example:
+"SPRINGS NEW 3 13H07 409266375" (must be unique)
+subDescription:
+"AUTOBANK CASH DEPOSIT"
+
+AFTER EVERY ATM CASH DEPOSIT:
+Create a TRAILING FEE transaction:
+
+mainDescription: "CASH WITHDRAWAL FEE"
+subDescription: "CASH WITHDRAWAL FEE"
+
+ATM DEPOSIT FEE CALCULATION:
+• 1200 → 31.80
+• 2300 → 51.80
+• Use proportional scaling for other values
+• Round to 2 decimals
+
+================================================================
+AIRTIME PURCHASE
+================================================================
+Airtime purchase:
+mainDescription:
+"VAS00161296940 TELKM0658016132"
+subDescription:
+"PREPAID MOBILE PURCHASE"
+
+IMMEDIATELY AFTER:
+Fee transaction:
+payment: 0.70
+mainDescription: "FEE: PREPAID MOBILE PURCHASE"
+subDescription: "FEE: PREPAID MOBILE PURCHASE"
+
+================================================================
+INCOMING MONEY RULES
+================================================================
+Incoming APP payment (NOT ATM):
+subDescription:
+"PAYSHAP PAYMENT FROM"
+OR
+"PAYMENT FROM"
+
+mainDescription:
+Sender name or reference
+
+ATM deposits MUST NEVER use these labels.
+
+================================================================
+MINIMUM TRANSACTION COUNTS
+================================================================
+Salary deposits: ${months}
+Rent payments: ${months}
+Groceries: ${months * 3}
+Fuel: ${months * 2}
+ATM activity: ${months}
+Utilities: ${months}
+Entertainment: ${Math.floor(months * 1.5)}
+Bank fees: ${months * 2}
+Transfers: ${Math.floor(months * 0.5)}
+
+================================================================
+BALANCE UPDATE ALGORITHM (NON-NEGOTIABLE)
+================================================================
+currentBalance = openingBalance
+
+For EACH transaction (chronological):
+• if deposit > 0 → currentBalance += deposit
+• if payment > 0 → currentBalance -= payment
+• transaction.balance = currentBalance
+
+🚫 At NO POINT may currentBalance drop below 0
+🚫 Payments MUST NEVER exceed currentBalance
+
+FINAL currentBalance MUST EQUAL:
+${availableBalance.toFixed(2)}
+
+================================================================
+OUTPUT REQUIREMENTS
+================================================================
+• EXACTLY ${transactionCount} transactions
+• Two decimal places only
+• NO currency symbols
+• RETURN ONLY valid JSON
+• Structure MUST match sampleStatementData EXACTLY
+
+REFERENCE STRUCTURE:
+${JSON.stringify(sampleStatementData, null, 2)}
+
+FINAL VALIDATION STEP (MANDATORY):
+Before returning JSON:
+✔ Validate running balance
+✔ Validate no overdrafts
+✔ Validate final balance EXACT MATCH
+✔ Fix any violations BEFORE returning
+`;
 };
+
 export const generateTymeBankPrompt = ({
     accountHolder,
     payDate,
@@ -134,7 +288,7 @@ export const generateTymeBankPrompt = ({
     let generationDate =
         statementPeriod?.generation_date || currentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    return `You are a financial-data generator for TymeBank statements. Produce strictly valid JSON with realistic, chronological, fully balanced TymeBank transaction data.
+    return `You are a financial-data generator for TymeBank statements. Your goal is to create a bank statement that is convincing enough for a vehicle, house, or loan application. Produce strictly valid JSON with realistic, chronological, and fully balanced TymeBank transaction data.
 
 IMPORTANT:
 - Today's date is ${currentDate.toLocaleDateString('en-GB')}.
@@ -196,7 +350,8 @@ Additional TymeBank Fees You MAY apply (only when logically relevant):
 - Cash deposit (till point): R10 per R1,000
 - International ATM balance enquiry: R70
 - Debit card or debit order decline: R3
-- Also add more money_in transactions to make it look like the user has other incomes
+- Include a consistent, significant rent payment between the 1st and 3rd of each month, shortly after the salary is paid.
+- Add other income sources besides salary. Use descriptions like 'Freelance Income', 'EFT from Client', or 'Side Business Revenue' to make the statement look stronger and more credible.
 
 JSON STRUCTURE (return ONLY valid JSON in this exact structure):
 

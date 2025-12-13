@@ -45,7 +45,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
             companyEmail,
             companyTel,
             title: `${title}.`,
-            bankType
+            bankType: bankType?.toUpperCase()
         });
         res.status(200).json(response);
     } catch (error) {

@@ -1,10 +1,17 @@
+// @ts-ignore
+import fontkit from 'fontkit';
 import { PDFDocument, PDFFont, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import { mkdirp } from 'mkdirp';
 import { TymeBankStatement } from './sample';
 import { COLORS, TABLE_CONFIG } from '../standard/constants';
+import path from 'path';
 
-export async function generateTymeBankPDF(data: TymeBankStatement, outputFilePath: string) {
+export async function generateTymeBankPDF(
+    data: TymeBankStatement,
+    outputFilePath: string,
+    options?: { includeLegalText?: boolean; includeClosingBorder?: boolean; includeClosingRow?: boolean }
+) {
     const topOffset = 130;
     const lineGap = 16.7;
     const left = 30;
@@ -22,12 +29,16 @@ export async function generateTymeBankPDF(data: TymeBankStatement, outputFilePat
     const secondPageBytes = fs.readFileSync('./files/tymebank/input2.pdf');
     const secondPageUint8Array = new Uint8Array(secondPageBytes);
     const secondPageDoc = await PDFDocument.load(secondPageUint8Array);
-
+    firstPageDoc.registerFontkit(fontkit);
+    secondPageDoc.registerFontkit(fontkit);
     // Create a new PDF document to hold all pages
     const finalPdfDoc = await PDFDocument.create();
+    finalPdfDoc.registerFontkit(fontkit);
 
-    const font: PDFFont = await finalPdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold: PDFFont = await finalPdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontBytes = fs.readFileSync(path.resolve('./files/fonts/Arial-Regular.ttf'));
+    const fontBoldBytes = fs.readFileSync(path.resolve('./files/fonts/Arial-Bold.ttf'));
+    const font: PDFFont = await finalPdfDoc.embedFont(new Uint8Array(fontBytes));
+    const fontBold: PDFFont = await finalPdfDoc.embedFont(new Uint8Array(fontBoldBytes));
 
     // Get page templates
     const firstPageTemplate = firstPageDoc.getPages()[0];
@@ -45,17 +56,24 @@ export async function generateTymeBankPDF(data: TymeBankStatement, outputFilePat
     const availableHeightFirstPage = firstPageTableStartY - minY;
     const availableHeightSecondPage = secondPageTableStartY - minY;
 
+    // Use filtered transactions if the caller does not want the closing balance row
+    const allTransactions = (
+        options?.includeClosingRow
+            ? data.transactions
+            : data.transactions.filter((tx) => tx.description !== 'Closing Balance' && tx.description !== 'Closing Balance - End of Month')
+    ) as typeof data.transactions;
+
     // Process all pages with dynamic transaction fitting
     let transactionIndex = 0;
     let totalPages = 0;
 
-    while (transactionIndex < data.transactions.length) {
+    while (transactionIndex < allTransactions.length) {
         const isFirstPage = totalPages === 0;
         const availableHeight = isFirstPage ? availableHeightFirstPage : availableHeightSecondPage;
         const tableStartY = isFirstPage ? firstPageTableStartY : secondPageTableStartY;
 
         // Calculate how many transactions fit on THIS page based on ACTUAL row heights
-        const pageTransactions = getTransactionsForPage(data.transactions.slice(transactionIndex), availableHeight, font, fontSize);
+        const pageTransactions = getTransactionsForPage(allTransactions.slice(transactionIndex), availableHeight, font, fontSize);
 
         // Copy the appropriate template page
         const sourceDoc = isFirstPage ? firstPageDoc : secondPageDoc;
@@ -160,11 +178,12 @@ export async function generateTymeBankPDF(data: TymeBankStatement, outputFilePat
             gap: lineGap,
             rightMargin,
             width,
-            isLastPage: transactionIndex + pageTransactions.length >= data.transactions.length
+            isLastPage: transactionIndex + pageTransactions.length >= allTransactions.length,
+            includeClosingBorder: options?.includeClosingBorder === true
         });
 
-        // Add legal text only on the very last page
-        if (transactionIndex + pageTransactions.length >= data.transactions.length) {
+        // Add legal text only on the very last page AND only when requested by caller
+        if (options?.includeLegalText && transactionIndex + pageTransactions.length >= allTransactions.length) {
             // Calculate position after table - need to calculate based on table height
             // Estimate table height based on number of transactions
             const estimatedTableHeight = pageTransactions.length * 17; // Average row height
@@ -204,7 +223,7 @@ export async function generateTymeBankPDF(data: TymeBankStatement, outputFilePat
         }
 
         // Add page number if needed
-        const estimatedTotalPages = Math.ceil(data.transactions.length / 25); // Rough estimate
+        const estimatedTotalPages = Math.ceil(allTransactions.length / 25); // Rough estimate
         if (estimatedTotalPages > 1) {
             addPageNumber(currentPage, totalPages + 1, estimatedTotalPages, width, height, font);
         }
@@ -270,6 +289,7 @@ function renderTable(options: {
     rightMargin: number;
     width: number;
     isLastPage?: boolean;
+    includeClosingBorder?: boolean;
 }) {
     const { page, font, width, data, startX, startY, fontSize, fontBold } = options;
 
@@ -467,8 +487,8 @@ function renderTable(options: {
         ------------------------------*/
         currentY -= rowHeight;
 
-        // Add bottom border to the last row (closing balance row) - ONLY on last page
-        if (index === data.transactions.length - 1 && options.isLastPage) {
+        // Add bottom border to the last row (closing balance row) - ONLY on last page and when requested
+        if (options.includeClosingBorder && options.isLastPage && (tx.description === 'Closing Balance' || index === data.transactions.length - 1)) {
             page.drawLine({
                 start: { x: tableOffsetX, y: currentY + 3 },
                 end: { x: tableOffsetX + (width - 38), y: currentY + 3 },
