@@ -10,6 +10,44 @@ import { BankType } from '../helpers/openai';
 import { generateTymeBankPDF } from './tymebank';
 import { TymeBankStatement } from './tymebank/sample';
 
+// Helper: rebalance TymeBank statements to enforce opening balance and continuity
+function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: number): TymeBankStatement[] {
+    const toNum = (v: any): number => {
+        if (v === '-' || v === undefined || v === null) return 0;
+        const n = typeof v === 'number' ? v : Number(String(v).replace(/[,\s]/g, ''));
+        return isNaN(n) ? 0 : n;
+    };
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+    // Sort statements by end date ascending to ensure chronological order
+    const parseDate = (s: string) => new Date(s);
+    const sorted = [...statements].sort((a, b) => parseDate(a.statement_period.to).getTime() - parseDate(b.statement_period.to).getTime());
+
+    let runningStart = typeof opening === 'number' ? opening : sorted[0]?.opening_balance ?? 0;
+
+    return sorted.map((stmt, idx) => {
+        let balance = runningStart;
+        const txs = (stmt.transactions || []).map((tx) => {
+            balance += toNum(tx.money_in);
+            balance -= toNum(tx.money_out);
+            balance -= toNum(tx.fees);
+            return { ...tx, balance: round2(balance) };
+        });
+
+        const opening_balance = round2(runningStart);
+        const closing_balance = round2(balance);
+        // Next month's opening is this month's closing
+        runningStart = closing_balance;
+
+        return {
+            ...stmt,
+            opening_balance,
+            closing_balance,
+            transactions: txs
+        } as TymeBankStatement;
+    });
+}
+
 export const generateBankStatement = async ({
     statementDetails,
     payslipData,
@@ -43,10 +81,13 @@ export const generateBankStatement = async ({
                 const today = new Date();
                 statementFiles = [];
 
-                for (let i = 0; i < rawData.statements.length; i++) {
-                    const statementData = rawData.statements[i];
+                // Enforce opening balance and continuity across months
+                const fixedStatements = rebalanceTymeStatements(rawData.statements as TymeBankStatement[], openBalance);
+
+                for (let i = 0; i < fixedStatements.length; i++) {
+                    const statementData = fixedStatements[i];
                     const monthDate = new Date(today);
-                    monthDate.setMonth(today.getMonth() - (rawData.statements.length - 1 - i));
+                    monthDate.setMonth(today.getMonth() - (fixedStatements.length - 1 - i));
 
                     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     const monthName = monthNames[monthDate.getMonth()];
@@ -68,9 +109,9 @@ export const generateBankStatement = async ({
 
                     console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
                     await generateTymeBankPDF(individualStatement, monthOutputPath, {
-                        includeLegalText: i === rawData.statements.length - 1,
-                        includeClosingBorder: i === rawData.statements.length - 1,
-                        includeClosingRow: i === rawData.statements.length - 1
+                        includeLegalText: i === fixedStatements.length - 1,
+                        includeClosingBorder: i === fixedStatements.length - 1,
+                        includeClosingRow: i === fixedStatements.length - 1
                     });
                     console.log(`Successfully generated PDF at ${monthOutputPath}`);
 
@@ -84,7 +125,7 @@ export const generateBankStatement = async ({
                 }
 
                 // Return the array of statement files
-                processedStatements = rawData.statements as TymeBankStatement[];
+                processedStatements = fixedStatements as TymeBankStatement[];
             } else {
                 // Process standard bank statement from raw AI data
                 const [statementData] = rawData.statements;
@@ -106,10 +147,13 @@ export const generateBankStatement = async ({
                 mkdirp.sync(accountFolder);
                 statementFiles = [];
 
-                for (let i = 0; i < processedStatements.length; i++) {
-                    const statement = processedStatements[i] as TymeBankStatement;
+                // Enforce opening balance and continuity across months
+                const fixedStatements = rebalanceTymeStatements(processedStatements as TymeBankStatement[], openBalance);
+
+                for (let i = 0; i < fixedStatements.length; i++) {
+                    const statement = fixedStatements[i] as TymeBankStatement;
                     const monthDate = new Date();
-                    monthDate.setMonth(monthDate.getMonth() - (processedStatements.length - 1 - i));
+                    monthDate.setMonth(monthDate.getMonth() - (fixedStatements.length - 1 - i));
 
                     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     const monthName = monthNames[monthDate.getMonth()];
@@ -120,9 +164,9 @@ export const generateBankStatement = async ({
 
                     console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
                     await generateTymeBankPDF(statement, monthOutputPath, {
-                        includeLegalText: i === processedStatements.length - 1,
-                        includeClosingBorder: i === processedStatements.length - 1,
-                        includeClosingRow: i === processedStatements.length - 1
+                        includeLegalText: i === fixedStatements.length - 1,
+                        includeClosingBorder: i === fixedStatements.length - 1,
+                        includeClosingRow: i === fixedStatements.length - 1
                     });
                     console.log(`Successfully generated PDF at ${monthOutputPath}`);
 
@@ -154,7 +198,8 @@ export const generateBankStatement = async ({
                 statementPath = await generateStandardBankStatement(outputFilePath, data);
             } else if (!Array.isArray(processedStatements)) {
                 // Safe type check before casting
-                const tymeStatement = processedStatements as unknown as TymeBankStatement;
+                const fixed = rebalanceTymeStatements([processedStatements as unknown as TymeBankStatement], openBalance);
+                const tymeStatement = fixed[0];
                 statementPath = await generateTymeBankPDF(tymeStatement, outputFilePath, {
                     includeLegalText: true,
                     includeClosingBorder: true,

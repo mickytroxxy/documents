@@ -158,7 +158,7 @@ FOR EVERY INTERNATIONAL CARD PURCHASE:
 payment: 11.83
 mainDescription: "FEE: INTERNATIONAL TRANSACTION"
 subDescription: "FEE: INTERNATIONAL TRANSACTION"
-
+ALL SALARY DEPOSIT, incoming funds not through ATM deposits must have a subDescription of PAYMENT FROM.
 ================================================================
 ATM CASH & FEES (CRITICAL)
 ================================================================
@@ -282,23 +282,11 @@ export const generateTymeBankPrompt = ({
     const fromDate = new Date();
     fromDate.setMonth(fromDate.getMonth() - (months - 1));
 
+    // Calculate specific month period if statementPeriod is provided
     let periodFrom = statementPeriod?.from || `01 ${fromDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
-
-    let periodTo =
-        statementPeriod?.to ||
-        currentDate.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
-
+    let periodTo = statementPeriod?.to || currentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     let generationDate =
-        statementPeriod?.generation_date ||
-        currentDate.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+        statementPeriod?.generation_date || currentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     return `You are a financial-data generator for TymeBank statements. Your goal is to create a bank statement that is convincing enough for a vehicle, house, or loan application. Produce strictly valid JSON with realistic, chronological, and fully balanced TymeBank transaction data.
 
@@ -308,39 +296,17 @@ IMPORTANT:
 - All balances must recalculate correctly after each transaction.
 - Use "–" (dash) instead of "0.00" in money_in, money_out, and fees fields when the value is zero.
 - DO NOT include "Opening Balance" as a transaction in the transactions array.
+- Salary deposits must not be trailed by company name like ABC.
 - The opening_balance field should contain the starting balance, but there should be NO transaction with description "Opening Balance".
-- The closing_balance is the FINAL AVAILABLE BALANCE and MUST equal the last transaction balance exactly.
 
-====================================================
-CRITICAL BALANCE ENFORCEMENT (NON-NEGOTIABLE)
-====================================================
-- At NO POINT may a transaction cause the balance to go negative.
-- You are STRICTLY FORBIDDEN from creating a payment transaction
-  where money_out is GREATER than the current running balance.
 🚫 YOU ARE STRICTLY FORBIDDEN FROM:
 • Making any payment that exceeds the CURRENT balance
 • Allowing the balance to go negative at ANY point
 • Creating a transaction that would cause insufficient funds
-Example (FORBIDDEN):
-- current balance: 1500
-- attempted payment: 2000
+. No repeated fees in a row. fees should be next to a real transaction
 
-This transaction MUST NOT exist.
-
-If the balance is insufficient:
-- Reduce the payment amount
-- Delay the transaction to a later date
-- OR omit the transaction entirely
-
-Violating this rule makes the output INVALID.
-
-====================================================
-MONTHLY DATE BEHAVIOUR
-====================================================
-- Most monthly spending (utilities, groceries, rent, transfers)
-  occurs between the 25th of one month and the 5th of the next month.
-- Salary must still occur exactly on day ${payDate}.
-- Rent must occur shortly AFTER salary and between the 1st–3rd.
+THIS IS A HARD FAILURE CONDITION.
+If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
 
 Core Input Data:
 - account_holder: "${accountHolder}"
@@ -356,7 +322,6 @@ ${currentMonth && totalMonths ? `- This is month ${currentMonth} of ${totalMonth
 Transaction Rules:
 1. Start transactions from the FIRST day of the period, NOT with an opening balance transaction.
 2. Include monthly salary deposits exactly on day ${payDate} of each month.
-   - Salary description must be "Salary Deposit" (do NOT invent company names).
 3. Include realistic spending categories: groceries, fuel, restaurants, clothing, transport, utilities, airtime, data, takeaways, online purchases, etc.
 4. Include realistic merchant names used in South Africa.
 5. Include bank-related transactions where appropriate (ATM withdrawal fees, immediate EFT fees, etc.).
@@ -364,14 +329,6 @@ Transaction Rules:
 7. NO future dates.
 8. The running balance MUST be updated after every transaction.
 9. The first transaction should NOT be "Opening Balance" - start with actual transactions.
-
-MANDATORY RENT RULE (VERY IMPORTANT):
-- Rent is MONEY OUT.
-- Rent MUST occur EVERY month.
-- Rent date must be between the 1st and 3rd.
-- Rent must occur AFTER salary.
-- Rent must be a fixed, consistent amount across all months.
-- Rent must NEVER be labelled as income.
 
 MANDATORY FEE RULE (VERY IMPORTANT):
 TymeBank does NOT charge for card purchases.
@@ -381,24 +338,30 @@ Therefore:
 - For EVERY purchase transaction (money_out),
   you MUST immediately generate a SECOND transaction object:
 
-{
-  "date": "same date",
-  "description": "Fee: Transactional SMS Notification",
-  "fees": "0.50",
-  "money_out": "-",
-  "money_in": "-",
-  "balance": (previous balance - 0.50)
-}
+   {
+     "date": "same date",
+     "description": "Fee: Transactional SMS Notification",
+     "fees": "0.50",
+     "money_out": "-",
+     "money_in": "-",
+     "balance": (previous balance - 0.50)
+   }
 
 - DO NOT combine fees with the main purchase.
 - The fee must ALWAYS appear as its own standalone transaction.
+- This applies to ANY POS purchase, online purchase, petrol station purchase, grocery store, clothing, restaurant, etc.
 
 Additional TymeBank Fees You MAY apply (only when logically relevant):
-- Cash withdrawal at SA ATM: R10 per R1,000 or part thereof
+- Cash withdrawal at SA ATM: R10 per R1,000 or part thereof (separate fee transaction)
 - Immediate EFT (PayShap): R7 per R1,000 (max R35)
 - Flash voucher purchase fee: R7
+- Unsuccessful debit order dispute: R60
+- Inactive account fee: R7 (only if account inactive for 6+ months)
 - Cash deposit (till point): R10 per R1,000
+- International ATM balance enquiry: R70
 - Debit card or debit order decline: R3
+- Include a consistent, significant rent payment between the 1st and 3rd of each month, shortly after the salary is paid.
+- Add other income sources besides salary. Use descriptions like 'Freelance Income', 'EFT from Client', or 'Side Business Revenue' to make the statement look stronger and more credible.
 
 JSON STRUCTURE (return ONLY valid JSON in this exact structure):
 
@@ -448,9 +411,10 @@ JSON STRUCTURE (return ONLY valid JSON in this exact structure):
 }
 
 CRITICAL REQUIREMENTS:
-- DO NOT include "Opening Balance" as a transaction.
-- The closing balance MUST equal the final transaction balance.
-- NO transaction may overdraw the account.
-- All balances must be mathematically accurate.
+- DO NOT include "Opening Balance" as a transaction in the transactions array.
+- The opening_balance field contains the starting amount, but transactions should start with real transactions.
+- Balances must be mathematically accurate.
+- No invalid numbers.
+- All fields strictly follow the format above.
 - Output ONLY the JSON.`;
 };

@@ -57,11 +57,48 @@ export async function generateTymeBankPDF(
     const availableHeightSecondPage = secondPageTableStartY - minY;
 
     // Use filtered transactions if the caller does not want the closing balance row
-    const allTransactions = (
+    let allTransactions = (
         options?.includeClosingRow
             ? data.transactions
             : data.transactions.filter((tx) => tx.description !== 'Closing Balance' && tx.description !== 'Closing Balance - End of Month')
     ) as typeof data.transactions;
+
+    // Helper to get numeric value
+    const getAmount = (val: number | string | null): number => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string' && val !== '-') {
+            const parsed = parseFloat(val);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+    };
+
+    // Filter out money_out transactions when current balance is negative, allow fees
+    const filteredTransactions = [];
+    let currentBalance = data.opening_balance || 0;
+    for (const tx of allTransactions) {
+        const moneyOutAmt = getAmount(tx.money_out);
+        if (moneyOutAmt > 0 && currentBalance < 0) {
+            // Skip money_out transactions when balance is negative
+        } else {
+            filteredTransactions.push(tx);
+            // Update running balance
+            currentBalance += getAmount(tx.money_in);
+            currentBalance -= getAmount(tx.money_out);
+            currentBalance -= getAmount(tx.fees);
+        }
+    }
+
+    // Recalculate balances for filtered transactions
+    currentBalance = data.opening_balance || 0;
+    for (const tx of filteredTransactions) {
+        currentBalance += getAmount(tx.money_in);
+        currentBalance -= getAmount(tx.money_out);
+        currentBalance -= getAmount(tx.fees);
+        tx.balance = currentBalance;
+    }
+
+    allTransactions = filteredTransactions as typeof data.transactions;
 
     // Process all pages with dynamic transaction fitting
     let transactionIndex = 0;
@@ -89,7 +126,7 @@ export async function generateTymeBankPDF(
         const { height, width } = currentPage.getSize();
 
         // Calculate starting position based on page type
-        const openingBalanceText = `${data?.opening_balance?.toFixed()}`;
+        const openingBalanceText = `${data?.opening_balance?.toFixed(2)}`;
         const openingBalanceWidth = font.widthOfTextAtSize(openingBalanceText, 8.2);
         const openingBalanceX = width - rightMargin - openingBalanceWidth;
         let startY: number;
