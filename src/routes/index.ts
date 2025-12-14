@@ -5,6 +5,7 @@ import { sendEmail } from '../handlers/sendEmail';
 import { sendProofOfPayment } from '../handlers/proofOfPayment';
 import { secrets } from '../server';
 import { generateDocs } from '../handlers/method';
+import { authenticate } from '../handlers/auth';
 
 const router = Router();
 router.post('/proof', sendProofOfPayment);
@@ -15,5 +16,6 @@ router.get('/secrets', (req, res) => {
 });
 
 router.post('/generateDocs', generateDocs);
+router.post('/authenticate', authenticate);
 
 export default router;

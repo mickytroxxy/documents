@@ -34,7 +34,16 @@ export const deleteData = async (tableName: string, docId: string): Promise<bool
         return false;
     }
 };
-
+export const authenticateUser = async (phoneNumber: string): Promise<any[]> => {
+    try {
+        const querySnapshot = await getDocs(query(collection(db, 'users'), where('phoneNumber', '==', phoneNumber || '')));
+        const data = querySnapshot.docs.map((doc) => doc.data());
+        return data;
+    } catch (e) {
+        console.error(e);
+        return [];
+    }
+};
 export const getSecretKeys = async (): Promise<any[]> => {
     try {
         const querySnapshot = await getDocs(query(collection(db, 'secrets')));

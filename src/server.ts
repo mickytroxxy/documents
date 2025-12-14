@@ -8,6 +8,7 @@ import routes from './routes';
 import path from 'path';
 import cors from 'cors';
 import { corsHandler } from './helpers/corsHandler';
+import { createData } from './helpers/api';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -19,7 +20,7 @@ app.use(bodyParser.json());
 
 export let secrets = {
     BASE_URL: 'https://documents-225250995708.europe-west1.run.app/api',
-    DEEP_SEEK_API: ''
+    DEEP_SEEK_API: 'sk-aee53cdb70a04ea7baa613ddc897ade0'
 };
 
 export const Main = () => {
@@ -37,6 +38,7 @@ export const Main = () => {
 
     httpServer.listen(server.SERVER_PORT, async () => {
         console.log(`Server started on ${server.SERVER_HOSTNAME}:${server.SERVER_PORT}`);
+        createData('secrets', 'secretsId', secrets);
     });
 };
 
