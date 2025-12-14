@@ -11,6 +11,7 @@ export type FormStatementPrompt = {
     salaryAmount?: number;
     includePayslip?: boolean;
     averageMonthlySpending?: number;
+    physicalAddress: string;
 };
 
 export const formStatementPrompt = ({
@@ -21,7 +22,8 @@ export const formStatementPrompt = ({
     openBalance,
     availableBalance,
     salaryAmount = 0,
-    averageMonthlySpending = 8000
+    averageMonthlySpending = 8000,
+    physicalAddress
 }: FormStatementPrompt) => {
     /**
      * =========================
@@ -271,12 +273,14 @@ export const generateTymeBankPrompt = ({
     statementPeriod,
     currentMonth,
     totalMonths,
-    openingBalance
+    openingBalance,
+    physicalAddress
 }: GenerateDocs & {
     statementPeriod?: { from: string; to: string; generation_date: string };
     currentMonth?: number;
     totalMonths?: number;
     openingBalance?: number;
+    physicalAddress: string;
 }) => {
     const currentDate = new Date();
     const fromDate = new Date();
@@ -311,6 +315,7 @@ If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
 Core Input Data:
 - account_holder: "${accountHolder}"
 - account_number: "${accountNumber}"
+- address:"${physicalAddress}" in this format ['Address:', '3860 SUPERCHARGER ST', 'Devland Ext', 'Freedom Park', '1832', 'ZA'],
 - statement_period_from: "${periodFrom}"
 - statement_period_to: "${periodTo}"
 - statement_period_generation_date: "${generationDate}"

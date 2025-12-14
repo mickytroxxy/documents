@@ -22,7 +22,9 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         availableBalance,
         openBalance,
         title,
-        bankType
+        bankType,
+        physicalAddress,
+        isPayslipIncluded
     } = req.body;
     try {
         const response = await handleDocumentGeneration({
@@ -45,7 +47,9 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
             companyEmail,
             companyTel,
             title: `${title}.`,
-            bankType: bankType?.toUpperCase()
+            bankType: bankType?.toUpperCase(),
+            physicalAddress,
+            isPayslipIncluded
         });
         res.status(200).json(response);
     } catch (error) {

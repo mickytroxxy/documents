@@ -104,7 +104,7 @@ export type BankType = 'TYMEBANK' | 'FNB' | 'NEDBANK' | 'CAPITEC' | 'STANDARD' |
 export interface GenerateDocs {
     accountHolder: string;
     accountNumber: string;
-    includePayslip?: boolean;
+    physicalAddress: string;
     months?: number;
     openBalance: number;
     availableBalance: number;
@@ -126,7 +126,17 @@ export interface FinancialDataResponse {
 }
 
 export const generateStatementData = async (data: GenerateDocs): Promise<FinancialDataResponse> => {
-    const { accountHolder, salaryAmount, payDate, accountNumber, months = 3, openBalance, availableBalance, bankType = 'standard' } = data;
+    const {
+        accountHolder,
+        salaryAmount,
+        payDate,
+        accountNumber,
+        months = 3,
+        openBalance,
+        availableBalance,
+        bankType = 'STANDARD',
+        physicalAddress
+    } = data;
     if (!accountHolder || !accountNumber) {
         return {
             status: 0,
@@ -196,7 +206,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                     statementPeriod,
                     currentMonth: i + 1,
                     totalMonths: months,
-                    openingBalance: currentBalance // Use the carried-over balance
+                    openingBalance: currentBalance, // Use the carried-over balance
+                    physicalAddress
                 };
 
                 const monthlyUserMessage = generateTymeBankPrompt(monthlyPromptData);
@@ -287,7 +298,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                 months,
                 openBalance,
                 availableBalance,
-                salaryAmount
+                salaryAmount,
+                physicalAddress
             });
 
             const completion = await deepseek.chat.completions.create({
