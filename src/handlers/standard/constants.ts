@@ -5,7 +5,7 @@ export const COLORS = {
     bankBlue: rgb(0 / 255, 51 / 255, 170 / 255), // #0033aa
     borderGray: rgb(0.85, 0.85, 0.85),
     redColor: rgb(0.7, 0, 0),
-    greenColor: rgb(0, 0.5, 0),
+    greenColor: rgb(0, 0.35, 0),
     grayColor: rgb(0.4, 0.4, 0.4),
     whiteColor: rgb(1, 1, 1),
     whiteBorderColor: rgb(0.5, 0.5, 0.5),

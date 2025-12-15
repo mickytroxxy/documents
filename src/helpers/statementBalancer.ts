@@ -1,101 +1,182 @@
-import { StatementData } from '../handlers/standard/types';
+import { StatementData, Transaction } from '../handlers/standard/types';
+import { placeholder } from '../handlers/standard/transactionplaceholder';
 
-export function rebalanceStatement(data: StatementData, targetAvailableBalance?: number, openBalance?: number): StatementData {
-    const toNum = (v: string | null) => {
-        if (!v) return 0;
-        const num = Number(v.replace(/,/g, ''));
-        return isNaN(num) ? 0 : num;
-    };
-    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/* -------------------- helpers -------------------- */
 
-    const fromDate = new Date(data.statementPeriod.from);
-    const toDate = new Date(data.statementPeriod.to);
-    const today = new Date();
-    const maxDate = new Date(Math.min(toDate.getTime(), today.getTime()));
+const toNum = (v: string | null) => {
+    if (!v) return 0;
+    const n = Number(v.replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+};
 
-    const safeParseDate = (s: string | null) => {
-        if (!s) return fromDate;
-        const d = new Date(s);
-        return isNaN(d.getTime()) ? fromDate : d;
-    };
-
-    // Filter out any opening balance transactions from AI
-    let transactions = data.transactions.filter((tx) => !tx.mainDescription.toUpperCase().includes('OPENING BALANCE'));
-
-    // Calculate current balance based on provided transactions (without opening balance)
-    let balanceFromTransactions = 0;
-    transactions.forEach((tx) => {
-        balanceFromTransactions += toNum(tx.deposit);
-        balanceFromTransactions -= toNum(tx.payment);
+const fmt = (n: number) =>
+    n.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
     });
 
-    const openingBalance = openBalance ?? 0;
-    const calculatedFinalBalance = openingBalance + balanceFromTransactions;
+const rand = (min: number, max: number) => Math.random() * (max - min) + min;
 
-    // If a target balance is provided, calculate and apply the adjustment
-    if (targetAvailableBalance !== undefined) {
-        const adjustment = targetAvailableBalance - calculatedFinalBalance;
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-        if (Math.abs(adjustment) > 0.005) {
-            // Check if adjustment is non-trivial
-            const adjustmentDate = new Date(maxDate);
-            adjustmentDate.setDate(adjustmentDate.getDate() - 1); // Place adjustment before the last day
+const cloneTx = (tx: Transaction): Transaction => ({
+    ...tx,
+    date: '',
+    deposit: '',
+    payment: '',
+    balance: ''
+});
 
-            transactions.push({
-                date: adjustmentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, ' '),
-                mainDescription: 'Balance Adjustment',
-                subDescription: 'Correction to align with target balance',
-                deposit: adjustment > 0 ? fmt(adjustment) : '',
-                payment: adjustment < 0 ? fmt(Math.abs(adjustment)) : '',
-                balance: '' // Will be recalculated
-            });
+/* -------------------- realism rules -------------------- */
+
+const MAX_SINGLE_TX_PCT = 0.08; // 8% of balance
+const LATE_PERIOD_DAYS = 10;
+const MIN_VARIANCE = 0.6;
+const MAX_VARIANCE = 1.4;
+
+/* -------------------- main function -------------------- */
+
+export function rebalanceStatement(data: StatementData, targetAvailableBalance?: number, openBalance = 0): StatementData {
+    const today = new Date();
+
+    /**
+     * End date:
+     * Use today (or yesterday) to show recent activity
+     */
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() - rand(0, 1)); // today or yesterday
+
+    /**
+     * Start date:
+     * Go back ~3 months from endDate,
+     * but NEVER before statementPeriod.from
+     */
+    const requestedFrom = new Date(data.statementPeriod.from);
+
+    const rollingFrom = new Date(endDate);
+    rollingFrom.setMonth(rollingFrom.getMonth() - 3);
+
+    const fromDate = rollingFrom > requestedFrom ? rollingFrom : requestedFrom;
+
+    /* remove AI opening balance noise */
+    let transactions = data.transactions.filter((t) => !t.mainDescription.toUpperCase().includes('OPENING BALANCE'));
+
+    /* calculate base balance */
+    let runningBalance = openBalance;
+    transactions.forEach((t) => {
+        runningBalance += toNum(t.deposit);
+        runningBalance -= toNum(t.payment);
+    });
+
+    const finalTarget = targetAvailableBalance ?? runningBalance;
+    let delta = finalTarget - runningBalance;
+
+    /* -------------------- progressive correction -------------------- */
+
+    if (Math.abs(delta) > 0.01) {
+        const daysSpan = (endDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        const chunks = Math.min(Math.max(Math.ceil(daysSpan / 7), 3), 8);
+
+        let lastAmount = 0;
+
+        for (let i = 0; i < chunks; i++) {
+            if (Math.abs(delta) < 5) break;
+
+            const isLate = i >= chunks - 2;
+
+            const maxAllowed = runningBalance * (isLate ? 0.04 : MAX_SINGLE_TX_PCT);
+
+            let raw = delta / (chunks - i);
+            raw *= rand(MIN_VARIANCE, MAX_VARIANCE);
+
+            let amount = Math.min(Math.abs(raw), maxAllowed);
+
+            /* prevent repetition */
+            if (Math.abs(amount - lastAmount) < 50) {
+                amount *= rand(0.7, 1.3);
+            }
+
+            amount = Math.max(50, Math.round(amount / 10) * 10);
+
+            if (amount <= 0) continue;
+            if (delta < 0 && amount > runningBalance) continue;
+
+            const date = new Date(fromDate.getTime() + rand(0.2, 0.9) * (endDate.getTime() - fromDate.getTime()));
+
+            const isDeposit = delta > 0;
+
+            const source = isDeposit ? pick(placeholder.deposits) : pick(placeholder.payments);
+
+            const tx = cloneTx(source as any);
+
+            tx.date = date
+                .toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: '2-digit'
+                })
+                .replace(/ /g, ' ');
+
+            if (isDeposit) {
+                tx.deposit = fmt(amount);
+                runningBalance += amount;
+                delta -= amount;
+            } else {
+                tx.payment = fmt(amount);
+                runningBalance -= amount;
+                delta += amount;
+            }
+
+            tx.balance = fmt(runningBalance);
+            lastAmount = amount;
+
+            transactions.push(tx);
         }
     }
 
-    // Add the definitive opening balance transaction at the beginning
+    /* -------------------- opening balance tx -------------------- */
+
     transactions.unshift({
         date: '',
         mainDescription: 'STATEMENT OPENING BALANCE',
         subDescription: '',
         deposit: '',
         payment: '',
-        balance: fmt(openingBalance)
+        balance: fmt(openBalance)
     });
 
-    // Sort all transactions chronologically, keeping opening balance at the top
+    /* -------------------- sort + rebalance -------------------- */
+
+    const parseDate = (s: string) => (s ? new Date(s.replace(/(\d{2}) (\w{3}) (\d{2})/, '20$3-$2-$1')) : fromDate);
+
     transactions.sort((a, b) => {
-        if (a.mainDescription.toUpperCase().includes('OPENING BALANCE')) return -1;
-        if (b.mainDescription.toUpperCase().includes('OPENING BALANCE')) return 1;
-        return safeParseDate(a.date).getTime() - safeParseDate(b.date).getTime();
+        if (a.mainDescription.includes('OPENING')) return -1;
+        if (b.mainDescription.includes('OPENING')) return 1;
+        return parseDate(a.date).getTime() - parseDate(b.date).getTime();
     });
 
-    // Recalculate all balances sequentially and format amounts consistently
-    let runningBalance = openingBalance;
+    runningBalance = openBalance;
+
     for (let i = 1; i < transactions.length; i++) {
-        const tx = transactions[i];
-        const depositNum = toNum(tx.deposit);
-        const paymentNum = toNum(tx.payment);
-
-        runningBalance += depositNum;
-        runningBalance -= paymentNum;
-
-        // Format fields: keep empties as empty strings
-        tx.deposit = depositNum > 0 ? fmt(depositNum) : '';
-        tx.payment = paymentNum > 0 ? fmt(paymentNum) : '';
-        tx.balance = fmt(runningBalance);
+        const t = transactions[i];
+        runningBalance += toNum(t.deposit);
+        runningBalance -= toNum(t.payment);
+        t.balance = fmt(runningBalance);
     }
 
-    // Final totals from the rebalanced transactions
-    const totalDeposits = transactions.reduce((sum, tx) => sum + toNum(tx.deposit), 0);
-    const totalPayments = transactions.reduce((sum, tx) => sum + toNum(tx.payment), 0);
+    /* -------------------- totals -------------------- */
+
+    const totalDeposits = transactions.reduce((s, t) => s + toNum(t.deposit), 0);
+    const totalPayments = transactions.reduce((s, t) => s + toNum(t.payment), 0);
 
     return {
         ...data,
-        transactions: transactions,
+        transactions,
         summary: {
             totalDeposits: fmt(totalDeposits),
             totalPayments: fmt(totalPayments),
-            availableBalance: fmt(runningBalance) // This is now the targetAvailableBalance
+            availableBalance: fmt(runningBalance)
         }
     };
 }

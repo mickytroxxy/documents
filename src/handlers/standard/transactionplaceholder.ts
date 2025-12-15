@@ -2,24 +2,8 @@ export const placeholder = {
     deposits: [
         {
             date: null,
-            mainDescription: 'SALARY DEPOSIT',
-            subDescription: 'MONTHLY SALARY NOVEMBER',
-            payment: null,
-            deposit: null,
-            balance: null
-        },
-        {
-            date: null,
-            mainDescription: 'INTEREST EARNED',
-            subDescription: 'SAVINGS ACCOUNT INTEREST',
-            payment: null,
-            deposit: null,
-            balance: null
-        },
-        {
-            date: null,
             mainDescription: 'FNB TRANSFER RECEIVED',
-            subDescription: 'FROM ACCOUNT 6234567890',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -27,7 +11,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'CAPITEC INSTANT PAY',
-            subDescription: 'PAYMENT RECEIVED',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -35,7 +19,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'BUSINESS PAYMENT',
-            subDescription: 'FREELANCE WORK PAYMENT',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -43,7 +27,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'REFUND RECEIVED',
-            subDescription: 'TAKEALOT.COM REFUND',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -51,7 +35,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'BONUS PAYMENT',
-            subDescription: 'YEAR-END BONUS',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -59,7 +43,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'DIVIDEND PAYMENT',
-            subDescription: 'INVESTMENT DIVIDEND',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -67,7 +51,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'RENTAL INCOME',
-            subDescription: 'PROPERTY RENTAL PAYMENT',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -75,7 +59,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'GOVERNMENT GRANT',
-            subDescription: 'SASSA PAYMENT',
+            subDescription: 'PAYMENT FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -85,7 +69,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'BOND PAYMENT',
-            subDescription: 'HOME LOAN INSTALLMENT',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null
@@ -93,7 +77,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'SHOPRITE SPRINGS MALL',
-            subDescription: 'GROCERIES AND HOUSEHOLD',
+            subDescription: 'DEBIT CARD PURCHASE FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -101,7 +85,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'ENGEN GARAGE',
-            subDescription: 'PETROL AND FUEL',
+            subDescription: 'DEBIT CARD PURCHASE FROM',
             payment: null,
             deposit: null,
             balance: null
@@ -109,7 +93,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'ESKOM ELECTRICITY',
-            subDescription: 'ELECTRICITY ACCOUNT',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null
@@ -117,7 +101,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'JOHANNESBURG WATER',
-            subDescription: 'WATER ACCOUNT PAYMENT',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null
@@ -125,7 +109,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'MTN AIRTIME',
-            subDescription: 'PREPAID RECHARGE',
+            subDescription: 'PREPAID MOBILE PURCHASE',
             payment: null,
             deposit: null,
             balance: null
@@ -133,7 +117,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'DSTV SUBSCRIPTION',
-            subDescription: 'PREMIUM PACKAGE',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null
@@ -149,7 +133,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'NETFLIX SUBSCRIPTION',
-            subDescription: 'MONTHLY SUBSCRIPTION',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null
@@ -157,7 +141,7 @@ export const placeholder = {
         {
             date: null,
             mainDescription: 'MEDICAL AID PAYMENT',
-            subDescription: 'DISCOVERY HEALTH',
+            subDescription: 'PAYMENT TO',
             payment: null,
             deposit: null,
             balance: null

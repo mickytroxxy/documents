@@ -181,7 +181,8 @@ export const handleDocumentGeneration = async ({
         salaryAmount: net,
         payDate,
         physicalAddress,
-        bankType: bankType as BankType
+        bankType: bankType as BankType,
+        companyName
     });
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected

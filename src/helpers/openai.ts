@@ -113,6 +113,7 @@ export interface GenerateDocs {
     payDate?: string;
     salaryAmount?: number;
     bankType?: BankType;
+    companyName: string;
 }
 
 export interface FinancialDataResponse {
@@ -135,7 +136,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
         openBalance,
         availableBalance,
         bankType = 'STANDARD',
-        physicalAddress
+        physicalAddress,
+        companyName
     } = data;
     if (!accountHolder || !accountNumber) {
         return {
@@ -207,7 +209,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                     currentMonth: i + 1,
                     totalMonths: months,
                     openingBalance: currentBalance, // Use the carried-over balance
-                    physicalAddress
+                    physicalAddress,
+                    companyName
                 };
 
                 const monthlyUserMessage = generateTymeBankPrompt(monthlyPromptData);
@@ -299,7 +302,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
                 openBalance,
                 availableBalance,
                 salaryAmount,
-                physicalAddress
+                physicalAddress,
+                companyName
             });
 
             const completion = await deepseek.chat.completions.create({

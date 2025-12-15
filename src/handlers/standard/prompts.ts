@@ -12,6 +12,9 @@ export type FormStatementPrompt = {
     includePayslip?: boolean;
     averageMonthlySpending?: number;
     physicalAddress: string;
+    fromDate?: string;
+    toDate?: string;
+    companyName: string;
 };
 
 export const formStatementPrompt = ({
@@ -23,21 +26,12 @@ export const formStatementPrompt = ({
     availableBalance,
     salaryAmount = 0,
     averageMonthlySpending = 8000,
-    physicalAddress
+    physicalAddress,
+    fromDate,
+    toDate,
+    companyName
 }: FormStatementPrompt) => {
-    /**
-     * =========================
-     * CORE CALCULATIONS
-     * =========================
-     */
-
-    // Total money leaving the account
     const totalPayments = averageMonthlySpending * months;
-
-    /**
-     * NON-NEGOTIABLE BALANCE LAW
-     * openingBalance + totalDeposits - totalPayments = availableBalance
-     */
     const totalDeposits = availableBalance - openBalance + totalPayments;
 
     const salaryTotal = salaryAmount * months;
@@ -55,8 +49,8 @@ export const formStatementPrompt = ({
     return `
 You are a South African bank-statement generator.
 Your output MUST be mathematically perfect, internally consistent,
-and suitable for loan approval.
-
+and suitable for loan approval. 
+The user works at ${companyName} so your salary deposits mainDescription can include the name
 ================================================================
 ABSOLUTE DATE CONSTRAINT (HARD RULE)
 ================================================================
@@ -117,6 +111,7 @@ This applies to:
 • Insurance-like payments
 
 Payments outside this window should be occasional only.
+ALSO PLEASE NOTE: We need realistic mainDescriptions, not things like LARGE PAYMENT, SMALL PAYMENT etc. The bank statement must look like a real bank statement that even the banks and reviewers can accept
 
 ================================================================
 RENT (STRICTLY ENFORCED)
@@ -161,6 +156,7 @@ payment: 11.83
 mainDescription: "FEE: INTERNATIONAL TRANSACTION"
 subDescription: "FEE: INTERNATIONAL TRANSACTION"
 ALL SALARY DEPOSIT, incoming funds not through ATM deposits must have a subDescription of PAYMENT FROM.
+
 ================================================================
 ATM CASH & FEES (CRITICAL)
 ================================================================
@@ -226,6 +222,32 @@ Bank fees: ${months * 2}
 Transfers: ${Math.floor(months * 0.5)}
 
 ================================================================
+PROGRESSIVE BALANCING (STRICT — NEW)
+================================================================
+You MUST achieve the final availableBalance progressively.
+
+🚫 NEVER use a single large deposit or payment to “fix” the balance.
+🚫 NEVER insert obvious balancing transactions.
+🚫 NEVER adjust more than 15–25% of the remaining balance gap in one transaction.
+
+If balance is too LOW:
+• Gradually increase deposits across multiple realistic transactions
+• Use salary, PAYSHAP, EFT, or ATM cash deposits
+• Spread corrections across days and weeks
+
+If balance is too HIGH:
+• Gradually increase spending via groceries, fuel, utilities, subscriptions, card purchases
+• Use realistic merchant descriptions
+• Prefer multiple small-to-medium payments over time
+
+By the FINAL WEEK:
+• Remaining balance difference should be < 5%
+• Final transactions must appear routine and unsuspicious
+• The last transaction MUST NOT look like an adjustment
+
+This MUST look like natural financial behaviour over time.
+
+================================================================
 BALANCE UPDATE ALGORITHM (NON-NEGOTIABLE)
 ================================================================
 currentBalance = openingBalance
@@ -249,6 +271,8 @@ OUTPUT REQUIREMENTS
 • NO currency symbols
 • RETURN ONLY valid JSON
 • Structure MUST match sampleStatementData EXACTLY
+• address:"${physicalAddress}" in this format ['Address:', '3860 SUPERCHARGER ST', 'Devland Ext', 'Freedom Park', '1832', 'ZA']
+Please use the physical address ${physicalAddress}
 
 REFERENCE STRUCTURE:
 ${JSON.stringify(sampleStatementData, null, 2)}
@@ -281,11 +305,12 @@ export const generateTymeBankPrompt = ({
     totalMonths?: number;
     openingBalance?: number;
     physicalAddress: string;
+    companyName: string;
 }) => {
     const currentDate = new Date();
     const fromDate = new Date();
     fromDate.setMonth(fromDate.getMonth() - (months - 1));
-
+    console.log('using ', physicalAddress);
     // Calculate specific month period if statementPeriod is provided
     let periodFrom = statementPeriod?.from || `01 ${fromDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
     let periodTo = statementPeriod?.to || currentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -311,11 +336,9 @@ IMPORTANT:
 
 THIS IS A HARD FAILURE CONDITION.
 If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
-
 Core Input Data:
 - account_holder: "${accountHolder}"
-- account_number: "${accountNumber}"
-- address:"${physicalAddress}" in this format ['Address:', '3860 SUPERCHARGER ST', 'Devland Ext', 'Freedom Park', '1832', 'ZA'],
+- account_number: "${accountNumber}",
 - statement_period_from: "${periodFrom}"
 - statement_period_to: "${periodTo}"
 - statement_period_generation_date: "${generationDate}"
