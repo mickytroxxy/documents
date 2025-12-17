@@ -9,6 +9,8 @@ import path from 'path';
 import cors from 'cors';
 import { corsHandler } from './helpers/corsHandler';
 import { createData } from './helpers/api';
+import { generateCapitecBankPDF } from './handlers/capitec';
+import { capitec_sample } from './handlers/capitec/sample';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -38,7 +40,7 @@ export const Main = () => {
 
     httpServer.listen(server.SERVER_PORT, async () => {
         console.log(`Server started on ${server.SERVER_HOSTNAME}:${server.SERVER_PORT}`);
-        createData('secrets', 'secretsId', secrets);
+        generateCapitecBankPDF(capitec_sample);
     });
 };
 

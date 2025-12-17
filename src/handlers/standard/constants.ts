@@ -7,11 +7,14 @@ export const COLORS = {
     redColor: rgb(0.7, 0, 0),
     greenColor: rgb(0, 0.35, 0),
     grayColor: rgb(0.4, 0.4, 0.4),
+    darkColor: rgb(0.1, 0.1, 0.1),
     whiteColor: rgb(1, 1, 1),
     whiteBorderColor: rgb(0.5, 0.5, 0.5),
     lightBlack: rgb(0.5, 0.5, 0.5),
     blackColor: rgb(0, 0, 0),
-    stampColor: rgb(0.35, 0.35, 0.35)
+    stampColor: rgb(0.35, 0.35, 0.35),
+    capitecBlue: rgb(0.1, 0.6, 0.9),
+    capitecTomato: rgb(0.9804, 0.0941, 0.149)
 };
 
 export const TABLE_CONFIG = {
