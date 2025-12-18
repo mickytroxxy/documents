@@ -566,7 +566,7 @@ function addPageNumber(page: any, pageNum: number, totalPages: number, width: nu
     });
 }
 
-function wrapText({ text, maxWidth, font, fontSize }: { text: string; maxWidth: number; font: PDFFont; fontSize: number }): string[] {
+export function wrapText({ text, maxWidth, font, fontSize }: { text: string; maxWidth: number; font: PDFFont; fontSize: number }): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';

@@ -2,7 +2,7 @@ import { PDFDocument, PDFFont, rgb, StandardFonts } from '@pdfme/pdf-lib';
 import fs from 'fs';
 import { mkdirp } from 'mkdirp';
 import { COLORS, TABLE_CONFIG } from '../standard/constants';
-import { CapitecBankStatement } from './sample';
+import { CapitecBankStatement, Transaction } from './sample';
 
 function formatNumberToCurrency(num: number): string {
     // Handle negative numbers
@@ -80,7 +80,35 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         const valueXRight = width - 195.2 - valueWidth;
         firstPage.drawText(value, { x: valueXRight, y, size: fontSize, font: fontBold, color: COLORS.darkColor });
     });
+    const fee_summary_rows: Array<[string, string]> = [
+        ['Cash Withdrawal Fee:', formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'Cash Withdrawal Fee')?.value || 0)],
+        ['Cash Sent Fee:', formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'Cash Sent Fee')?.value || 0)],
+        [
+            'Cash Deposit Fee (Notes):',
+            formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'Cash Deposit Fee (Notes)')?.value || 0)
+        ],
+        [
+            'DebtCheck Insufficient Funds Fee:',
+            formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'DebtCheck Insufficient Funds Fee')?.value || 0)
+        ],
+        [
+            'External Immediate Payment Fee:',
+            formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'External Immediate Payment Fee')?.value || 0)
+        ],
+        [
+            'International Processing Fee:',
+            formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'International Processing Fee')?.value || 0)
+        ],
+        ['Other Fees:', formatNumberToCurrency(data.fee_summary?.breakdown?.find((fee) => fee.name === 'Other Fees')?.value || 0)]
+    ];
 
+    fee_summary_rows.forEach(([label, value], idx) => {
+        const y = startY - gap * idx - 464;
+        firstPage.drawText(label, { x: 308.5, y: y - 0.2, size: fontSize, font, color: COLORS.blackColor });
+        const valueWidth = fontBold.widthOfTextAtSize(value, fontSize);
+        const valueXRight = width - 37.2 - valueWidth;
+        firstPage.drawText(value, { x: valueXRight, y: y - 0.2, size: fontSize, font: fontBold, color: COLORS.blackColor });
+    });
     const interestBarWidth = Math.max(8.2, (interestReceived / Math.max(interestReceived, totalFees)) * 166.2);
     const feesBarWidth = Math.max(8.2, (totalFees / Math.max(interestReceived, totalFees)) * 166.2);
     firstPage.drawRectangle({ x: 161.8, y: startY - 163, width: interestBarWidth, height: 6.1, radius: 6, color: COLORS.capitecBlue });
@@ -92,7 +120,20 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         const valueXRight = width - 197 - valueWidth;
         firstPage.drawText(value, { x: valueXRight, y, size: fontSize, font: fontBold, color: COLORS.darkColor });
     });
-
+    firstPage.drawText(formatNumberToCurrency(data?.live_better_benefits?.live_better_savings), {
+        x: 62.3,
+        y: startY - 500.5,
+        size: fontSize + 2,
+        font: fontBold,
+        color: COLORS.darkColor
+    });
+    firstPage.drawText(formatNumberToCurrency(data?.live_better_benefits?.live_better_savings), {
+        x: 252.5,
+        y: startY - 469,
+        size: fontSize,
+        font: fontBold,
+        color: COLORS.darkColor
+    });
     const money_in_summary: Array<[number]> = [
         [data?.money_in_summary?.breakdown?.other_income],
         [data?.money_in_summary?.breakdown?.cash_deposit],
@@ -201,6 +242,224 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         secondPage.drawText(formatNumberToCurrency(value) || '', { x: valueXRight + 1, y, size: fontSize, font: fontBold, color: COLORS.darkColor });
     });
 
+    const tableOffsetX = 34; // Move entire table left/right
+    const colDateX = tableOffsetX;
+    const colDescX = tableOffsetX + 47;
+
+    // Alternating row colors
+    const rowLightGray = rgb(0.91, 0.91, 0.91);
+    const rowWhite = rgb(1, 1, 1);
+    let currentY = startY + 60;
+
+    data?.scheduled_payments?.debit_orders?.forEach((item, idx) => {
+        const rowHeight = 12;
+        const rowY = currentY - rowHeight;
+        const isEvenRow = idx % 2 !== 0;
+        const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
+        secondPage.drawRectangle({ x: tableOffsetX, y: rowY, width: 252, height: rowHeight, color: backgroundColor });
+        secondPage.drawText(item.date, { x: colDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(item.description, { x: colDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+
+        // Amount (Money Out)
+        const amountText = formatNumberToCurrency(item.amount);
+        const amountWidth = fontBold.widthOfTextAtSize(amountText, fontSize);
+        secondPage.drawText(amountText, { x: width - 310 - amountWidth, y: rowY + 4, size: fontSize, font: fontBold, color: COLORS.darkColor });
+
+        currentY -= rowHeight;
+    });
+
+    const tableBOffsetX = 308.4; // Move entire table left/right
+    const colBDateX = tableBOffsetX;
+    const colBDescX = tableBOffsetX + 47;
+    data?.scheduled_payments?.card_subscriptions?.forEach((item, idx) => {
+        const rowHeight = 12;
+        const rowY = currentY - rowHeight + 24;
+        const isEvenRow = idx % 2 !== 0;
+        const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
+        secondPage.drawRectangle({ x: tableBOffsetX, y: rowY, width: 252, height: rowHeight, color: backgroundColor });
+        secondPage.drawText(item.date, { x: colBDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(item.description, { x: colBDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+
+        // Amount (Money Out)
+        const amountText = formatNumberToCurrency(item.amount);
+        const amountWidth = fontBold.widthOfTextAtSize(amountText, fontSize);
+        secondPage.drawText(amountText, { x: width - 37 - amountWidth, y: rowY + 4, size: fontSize, font: fontBold, color: COLORS.darkColor });
+
+        currentY -= rowHeight;
+    });
+    renderTable(secondPage, data.transaction_history, font, fontBold);
     const pdfBytes = await pdfDoc.save();
     fs.writeFileSync('./files/capitec/output.pdf', pdfBytes);
+}
+
+const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontBold: PDFFont) => {
+    const MARGIN_RIGHT = 34.5;
+    const MARGIN_LEFT = 34.5;
+    const { width } = page.getSize();
+    const tableBOffsetX = MARGIN_LEFT;
+    const tableWidth = width - MARGIN_LEFT - MARGIN_RIGHT;
+
+    // Column positions
+    const colDateX = tableBOffsetX;
+    const colDescX = colDateX + 50;
+    const colCatX = colDescX + 205;
+    const colMoneyInX = colCatX + 45;
+    const colMoneyOutX = colMoneyInX + 138;
+    const colFeeX = colMoneyOutX + 40;
+
+    let currentY = 320;
+    const fontSize = 7.99;
+    const lineHeight = 12;
+    const maxDescWidth = 180;
+    const rowLightGray = rgb(0.91, 0.91, 0.91);
+    const rowWhite = rgb(1, 1, 1);
+
+    currentY -= lineHeight + 4;
+
+    transaction?.forEach((item, idx) => {
+        const isEvenRow = idx % 2 !== 0;
+        const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
+
+        // Split description into lines
+        const descText = item.description || '';
+        const descLines = splitTextIntoLines(descText, maxDescWidth, font, fontSize);
+        const lineCount = Math.min(descLines.length, 3);
+        const rowHeight = lineHeight * Math.max(lineCount, 1);
+
+        const rowY = currentY - rowHeight + lineHeight;
+
+        // Draw row background
+        page.drawRectangle({
+            x: tableBOffsetX,
+            y: rowY - 2,
+            width: tableWidth,
+            height: rowHeight,
+            color: backgroundColor
+        });
+
+        // Calculate Y position for first line (top of text)
+        const firstLineY = rowY + rowHeight - fontSize - 3;
+
+        // Draw Date on the first line (same Y as first description line)
+        page.drawText(item?.date || '', {
+            x: colDateX,
+            y: firstLineY,
+            size: fontSize,
+            font,
+            color: COLORS.darkColor
+        });
+
+        // Draw description lines
+        descLines.slice(0, 3).forEach((line, lineIdx) => {
+            const lineY = firstLineY - lineIdx * lineHeight;
+            page.drawText(line, {
+                x: colDescX,
+                y: lineY,
+                size: fontSize,
+                font,
+                color: COLORS.darkColor
+            });
+        });
+
+        const categoryText = item.category || '';
+        page.drawText(categoryText, {
+            x: colCatX + 16,
+            y: firstLineY,
+            size: fontSize,
+            font,
+            color: COLORS.darkColor
+        });
+
+        // Money In
+        if (item.money_in !== null && item.money_in !== undefined) {
+            const moneyInText = formatNumberToCurrency(item.money_in);
+            const moneyInWidth = font.widthOfTextAtSize(moneyInText, fontSize);
+            page.drawText(moneyInText, {
+                x: width - MARGIN_RIGHT - (tableWidth - (colMoneyInX + 42)) - moneyInWidth,
+                y: firstLineY,
+                size: fontSize,
+                font,
+                color: COLORS.darkColor
+            });
+        }
+
+        // Money Out
+        if (item.money_out !== null && item.money_out !== undefined) {
+            const moneyOutText = formatNumberToCurrency(item.money_out);
+            const moneyOutWidth = font.widthOfTextAtSize(moneyOutText, fontSize);
+            page.drawText(moneyOutText, {
+                //x: colMoneyOutX + 40 - moneyOutWidth,
+                x: width - MARGIN_RIGHT - (tableWidth - (colMoneyOutX - 39)) - moneyOutWidth,
+                y: firstLineY,
+                size: fontSize,
+                font,
+                color: COLORS.redColor
+            });
+        }
+
+        // Fee
+        if (item.fee !== null && item.fee !== undefined) {
+            const feeText = formatNumberToCurrency(item.fee);
+            const feeWidth = font.widthOfTextAtSize(feeText, fontSize);
+            page.drawText(feeText, {
+                x: width - MARGIN_RIGHT - (tableWidth - (colFeeX - 37)) - feeWidth,
+                y: firstLineY,
+                size: fontSize,
+                font,
+                color: COLORS.darkColor
+            });
+        }
+
+        // Balance
+        if (item.balance !== null && item.balance !== undefined) {
+            const balanceText = formatNumberToCurrency(item.balance);
+            const balanceWidth = font.widthOfTextAtSize(balanceText, fontSize);
+            page.drawText(balanceText, {
+                x: width - MARGIN_RIGHT - balanceWidth - 2,
+                y: firstLineY,
+                size: fontSize,
+                font: font,
+                color: COLORS.darkColor
+            });
+        }
+
+        currentY -= rowHeight;
+    });
+};
+
+function splitTextIntoLines(text: string, maxWidth: number, font: PDFFont, fontSize: number): string[] {
+    const lines: string[] = [];
+    let currentLine = '';
+
+    // Simple splitting by space
+    const words = text.split(' ');
+
+    for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (font.widthOfTextAtSize(testLine, fontSize) <= maxWidth) {
+            currentLine = testLine;
+        } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+
+            // If word itself is too long, we need to break it
+            if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
+                // For very long words, just truncate with ellipsis
+                let truncated = word;
+                while (truncated.length > 3 && font.widthOfTextAtSize(truncated + '...', fontSize) > maxWidth) {
+                    truncated = truncated.slice(0, -1);
+                }
+                if (truncated.length < word.length) {
+                    lines.push(truncated + '...');
+                    currentLine = '';
+                }
+            }
+        }
+    }
+
+    if (currentLine) {
+        lines.push(currentLine);
+    }
+
+    return lines;
 }

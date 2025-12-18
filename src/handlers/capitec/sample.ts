@@ -1,3 +1,12 @@
+export interface Transaction {
+    date: string;
+    description: string | null;
+    category: string | null;
+    money_in: number | null;
+    money_out: number | null;
+    fee: number | null;
+    balance: number | null;
+}
 export interface CapitecBankStatement {
     account_holder: {
         name: string;
@@ -53,7 +62,7 @@ export interface CapitecBankStatement {
     };
     fee_summary: {
         total: number;
-        breakdown: string[];
+        breakdown: { name: string; value: number }[];
     };
     scheduled_payments: {
         debit_orders: Array<{
@@ -91,15 +100,7 @@ export interface CapitecBankStatement {
             doctors_therapists: number;
         };
     };
-    transaction_history: Array<{
-        date: string;
-        description: string | null;
-        category: string | null;
-        money_in: number | null;
-        money_out: number | null;
-        fee: number | null;
-        balance: number | null;
-    }>;
+    transaction_history: Transaction[];
     tax_invoice: {
         vat_registration_number: string;
     };
@@ -170,13 +171,13 @@ export const capitec_sample: CapitecBankStatement = {
     fee_summary: {
         total: 913.19,
         breakdown: [
-            'Cash Withdrawal Fee',
-            'Cash Sent Fee',
-            'Cash Deposit Fee (Notes)',
-            'DebtCheck Insufficient Funds Fee',
-            'External Immediate Payment Fee',
-            'International Processing Fee',
-            'Other Fees'
+            { name: 'Cash Withdrawal Fee', value: 873.19 },
+            { name: 'Cash Sent Fee', value: 0 },
+            { name: 'Cash Deposit Fee (Notes)', value: 0 },
+            { name: 'DebtCheck Insufficient Funds Fee', value: 0 },
+            { name: 'External Immediate Payment Fee', value: 0 },
+            { name: 'International Processing Fee', value: 0 },
+            { name: 'Other Fees', value: 0 }
         ]
     },
     scheduled_payments: {
@@ -234,8 +235,8 @@ export const capitec_sample: CapitecBankStatement = {
             description: 'Eft Debit Order Insufficient Funds Fee',
             category: 'Fees',
             money_in: null,
-            money_out: -6.0,
-            fee: null,
+            money_out: null,
+            fee: -6.0,
             balance: -120.45
         },
         {
@@ -252,8 +253,8 @@ export const capitec_sample: CapitecBankStatement = {
             description: 'DebtCheck Insufficient Funds Fee',
             category: 'Fees',
             money_in: null,
-            money_out: -6.0,
-            fee: null,
+            money_out: null,
+            fee: -6.0,
             balance: -126.45
         },
         {
@@ -306,8 +307,8 @@ export const capitec_sample: CapitecBankStatement = {
             description: 'International Online Purchase Insufficient Funds Fee: Goodje *play G.co/helppay# Us',
             category: 'Fees',
             money_in: null,
-            money_out: -3.0,
-            fee: null,
+            money_out: null,
+            fee: -3.0,
             balance: 16.55
         },
         {
@@ -315,8 +316,8 @@ export const capitec_sample: CapitecBankStatement = {
             description: 'International Online Purchase Insufficient Funds Fee: Goodje*play G.co/helppay# Us',
             category: 'Fees',
             money_in: null,
-            money_out: -3.0,
-            fee: null,
+            money_out: null,
+            fee: -3.0,
             balance: 13.55
         },
         {
