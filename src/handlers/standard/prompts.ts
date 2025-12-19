@@ -127,7 +127,7 @@ subDescription MUST ALWAYS BE:
 
 Rules:
 • Occurs between the 1st and 3rd of each month
-• Amount range: 4000–12000
+• Amount range: 2000–12000. rent must be realistic based on salary. a person earning 3000 cannot be paying 9000 rent. rent must be at less than 20% - 40% of salary
 • SAME amount every month
 • NEVER mark rent as income
 • NEVER use "RENTAL INCOME"
@@ -325,6 +325,7 @@ IMPORTANT:
 - All balances must recalculate correctly after each transaction.
 - Use "–" (dash) instead of "0.00" in money_in, money_out, and fees fields when the value is zero.
 - DO NOT include "Opening Balance" as a transaction in the transactions array.
+-• Amount range: 2000–12000. rent must be realistic based on salary. a person earning 3000 cannot be paying 9000 rent. rent must be at less than 20% - 40% of salary
 - Salary deposits must not be trailed by company name like ABC.
 - The opening_balance field should contain the starting balance, but there should be NO transaction with description "Opening Balance".
 
