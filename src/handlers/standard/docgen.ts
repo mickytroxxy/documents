@@ -186,8 +186,8 @@ export const handleDocumentGeneration = async ({
     });
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected
-        // Handle the case where we have a mixed array of StatementData | TymeBankStatement
-        let statementDetails: StatementData | { statements: any[]; rawData: any } | TymeBankStatement[];
+        // Handle the case where we have a mixed array of StatementData | TymeBankStatement | CapitecBankStatement
+        let statementDetails: StatementData | { statements: any[]; rawData: any } | TymeBankStatement[] | any;
 
         // Check if this is TymeBank data (array of statements) or Standard Bank data (single statement)
         if (bankType === 'TYMEBANK') {
@@ -201,8 +201,8 @@ export const handleDocumentGeneration = async ({
                 }
             };
         } else {
-            // For standard banks, use the first statement directly
-            statementDetails = financialData.data.statements[0] as StatementData;
+            // For standard banks and Capitec, use the first statement directly
+            statementDetails = financialData.data.statements[0];
         }
 
         const results = await generateBankStatement({

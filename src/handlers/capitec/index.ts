@@ -1,30 +1,59 @@
-import { PDFDocument, PDFFont, rgb, StandardFonts } from '@pdfme/pdf-lib';
+import { PDFDocument, PDFFont, rgb, StandardFonts, degrees } from '@pdfme/pdf-lib';
 import fs from 'fs';
 import { mkdirp } from 'mkdirp';
 import { COLORS, TABLE_CONFIG } from '../standard/constants';
 import { CapitecBankStatement, Transaction } from './sample';
 
-function formatNumberToCurrency(num: number): string {
+function formatNumberToCurrency(num: number, symbol = true): string {
     // Handle negative numbers
     const isNegative = num < 0;
-    const absoluteNum = Math.abs(num);
+    const absoluteNum = Math.abs(isFinite(num) ? num : 0);
 
     // Format with space as thousand separator and dot as decimal
     const parts = absoluteNum.toFixed(2).split('.');
     const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const decimalPart = parts[1];
 
-    return `${isNegative ? '-' : ''}R${integerPart}.${decimalPart}`;
+    return `${isNegative ? '-' : ''}${symbol ? 'R' : ''}${integerPart}.${decimalPart}`;
 }
-export async function generateCapitecBankPDF(data: CapitecBankStatement) {
+
+function safeBarWidth(value: number, maxValue: number, fullWidth: number, minWidth = 10): number {
+    const v = isFinite(value) ? Math.abs(value) : 0;
+    const maxV = isFinite(maxValue) && maxValue > 0 ? maxValue : 0;
+    if (maxV === 0) return minWidth;
+    const width = (v / maxV) * fullWidth;
+    return Math.max(minWidth, isFinite(width) ? width : minWidth);
+}
+
+const safeText = (val: any, fallback = ''): string => {
+    if (val === null || val === undefined) return fallback;
+    const s = String(val);
+    return s.length ? s : fallback;
+};
+
+const formatSAStampDate = (): string => {
+    const now = new Date();
+    const tzDate = new Date(now.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }));
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const day = pad(tzDate.getDate());
+    const month = pad(tzDate.getMonth() + 1);
+    const year = tzDate.getFullYear();
+    const hours = pad(tzDate.getHours());
+    const minutes = pad(tzDate.getMinutes());
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+export async function generateCapitecBankPDF(data: CapitecBankStatement, outputPath?: string) {
     const topOffset = 130;
     const lineGap = 12;
     const fontSize = 8;
 
-    const interestReceived = data.money_in_summary?.breakdown?.interest || 4.64; // Already a number!
+    // Page padding constants
+    const PAGE_BOTTOM_PADDING = 220;
+    const TRANSACTION_START_Y_FIRST_PAGE = 320;
+    const TRANSACTION_START_Y_ADDITIONAL_PAGES = 600;
+
+    const interestReceived = data.money_in_summary?.breakdown?.interest;
     const totalFees = data.fee_summary?.total || 913.19; // Already a number!
-    const totalMoneyIn = data.money_in_summary?.total || 99544.79;
-    const totalMoneyOut = data.money_out_summary?.total || 99299.11;
 
     mkdirp.sync('./files/capitec');
     const existingPdfBytes = fs.readFileSync('./files/capitec/input.pdf');
@@ -53,10 +82,43 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         const y = startY - gap * idx + 31;
         firstPage.drawText(label, { x: 34.5, y, size: fontSize, font: idx === 0 ? fontBold : font, color: COLORS.darkColor });
     });
+    const printDateStamp = formatSAStampDate();
+    firstPage.drawText('Capitec Bank', {
+        x: 274,
+        y: startY + 35.7,
+        size: fontSize + 3,
+        font: font,
+        color: rgb(0.6, 0.6, 0.6),
+        rotate: degrees(-10)
+    });
+    firstPage.drawText(printDateStamp, {
+        x: 260,
+        y: startY + 27,
+        size: fontSize + 3,
+        font: font,
+        color: rgb(0.6, 0.6, 0.6),
+        rotate: degrees(-10)
+    });
+    firstPage.drawText(`Branch: 470010`, {
+        x: 261.5,
+        y: startY + 16,
+        size: fontSize + 3,
+        font: font,
+        color: rgb(0.6, 0.6, 0.6),
+        rotate: degrees(-9.6)
+    });
+    firstPage.drawText(`Device: 9003`, {
+        x: 267,
+        y: startY + 4,
+        size: fontSize + 2.5,
+        font: font,
+        color: rgb(0.6, 0.6, 0.6),
+        rotate: degrees(-9)
+    });
     const statement_details_row: Array<[string, string]> = [
         ['From Date:', data.statement_period?.from_date || 'N/A'],
         ['To Date:', `${data.statement_period.to_date}`],
-        ['Print Date:', data.bank_details?.print_date || 'N/A']
+        ['Print Date:', `${printDateStamp}`]
     ];
     const balance_details_row: Array<[string, string]> = [
         ['Opening Balance:', formatNumberToCurrency(data.balances?.opening_balance || 0)],
@@ -71,7 +133,13 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         firstPage.drawText(label, { x: 34.5, y, size: fontSize, font, color: COLORS.darkColor });
         const valueWidth = fontBold.widthOfTextAtSize(value, fontSize);
         const valueXRight = width - 384 - valueWidth;
-        firstPage.drawText(value, { x: valueXRight, y, size: fontSize, font: fontBold, color: COLORS.darkColor });
+        firstPage.drawText(value, {
+            x: valueXRight,
+            y,
+            size: fontSize,
+            font: fontBold,
+            color: COLORS.darkColor
+        });
     });
     balance_details_row.forEach(([label, value], idx) => {
         const y = startY - gap * idx - 106;
@@ -109,8 +177,9 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         const valueXRight = width - 37.2 - valueWidth;
         firstPage.drawText(value, { x: valueXRight, y: y - 0.2, size: fontSize, font: fontBold, color: COLORS.blackColor });
     });
-    const interestBarWidth = Math.max(8.2, (interestReceived / Math.max(interestReceived, totalFees)) * 166.2);
-    const feesBarWidth = Math.max(8.2, (totalFees / Math.max(interestReceived, totalFees)) * 166.2);
+    const maxInterestFees = Math.max(interestReceived, totalFees);
+    const interestBarWidth = safeBarWidth(interestReceived, maxInterestFees, 166.2, 8.2);
+    const feesBarWidth = safeBarWidth(totalFees, maxInterestFees, 166.2, 8.2);
     firstPage.drawRectangle({ x: 161.8, y: startY - 163, width: interestBarWidth, height: 6.1, radius: 6, color: COLORS.capitecBlue });
     firstPage.drawRectangle({ x: 161.8, y: startY - 175, width: feesBarWidth, height: 6.1, radius: 6, color: COLORS.capitecTomato });
     const summary_values: Array<[string]> = [[formatNumberToCurrency(interestReceived)], [formatNumberToCurrency(totalFees)]];
@@ -134,6 +203,37 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
         font: fontBold,
         color: COLORS.darkColor
     });
+    firstPage.drawText(`${data?.account_holder?.account_number}`, {
+        x: 339.7,
+        y: startY - 67.8,
+        size: fontSize + 2,
+        font: fontBold,
+        color: COLORS.whiteColor
+    });
+    const value_money_in_width = fontBold.widthOfTextAtSize(`${formatNumberToCurrency(data?.money_in_summary?.total)}`, fontSize);
+    firstPage.drawText(`${formatNumberToCurrency(data?.money_in_summary?.total)}`, {
+        x: width - 324.6 - value_money_in_width,
+        y: startY - 264.5,
+        size: fontSize + 2,
+        font: fontBold,
+        color: COLORS.whiteColor
+    });
+    const value_money_out_width = fontBold.widthOfTextAtSize(`-${formatNumberToCurrency(data?.money_out_summary?.total)}`, fontSize);
+    firstPage.drawText(`-${formatNumberToCurrency(data?.money_out_summary?.total)}`, {
+        x: width - 51.5 - value_money_out_width,
+        y: startY - 264.5,
+        size: fontSize + 2,
+        font: fontBold,
+        color: COLORS.whiteColor
+    });
+    const value_fee_width = fontBold.widthOfTextAtSize(`-${formatNumberToCurrency(data?.fee_summary?.total)}`, fontSize);
+    firstPage.drawText(`-${formatNumberToCurrency(data?.fee_summary?.total)}`, {
+        x: width - 48.6 - value_fee_width,
+        y: startY - 437.3,
+        size: fontSize + 2,
+        font: fontBold,
+        color: COLORS.whiteColor
+    });
     const money_in_summary: Array<[number]> = [
         [data?.money_in_summary?.breakdown?.other_income],
         [data?.money_in_summary?.breakdown?.cash_deposit],
@@ -148,7 +248,14 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
             data?.money_in_summary?.breakdown?.transfer || 0,
             data?.money_in_summary?.breakdown?.interest || 0
         );
-        const barWidth = Math.max(10, (value / (maxMoneyInValue || 1)) * 59.5);
+
+        // Baseline visible even at zero; proportional growth above it
+        const fullWidth = 59.5;
+        const minWidth = 10;
+        const zeroWidth = 7;
+        const ratio = maxMoneyInValue > 0 ? Math.abs(value || 0) / maxMoneyInValue : 0;
+        const barWidth = value > 0 ? minWidth + ratio * (fullWidth - minWidth) : zeroWidth;
+
         firstPage.drawRectangle({ x: 155.5, y, width: barWidth, height: 6.3, radius: 6, color: COLORS.capitecBlue });
         const valueWidth = fontBold.widthOfTextAtSize(formatNumberToCurrency(value) || '', fontSize);
         const valueXRight = width - 311 - valueWidth;
@@ -181,7 +288,14 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
             data?.money_out_summary?.breakdown?.transfer || 0,
             data?.money_out_summary?.breakdown?.vouchers || 0
         );
-        const barWidth = Math.max(10, (value / (maxMoneyOutValue || 1)) * 59.9);
+
+        // Baseline visible even at zero; proportional growth above it
+        const fullWidth = 59.9;
+        const minWidth = 10;
+        const zeroWidth = 7;
+        const ratio = maxMoneyOutValue > 0 ? Math.abs(value || 0) / maxMoneyOutValue : 0;
+        const barWidth = value > 0 ? minWidth + ratio * (fullWidth - minWidth) : zeroWidth;
+
         firstPage.drawRectangle({ x: 429, y, width: barWidth, height: 6.3, radius: 6, color: COLORS.capitecTomato });
         const valueWidth = fontBold.widthOfTextAtSize(formatNumberToCurrency(value) || '', fontSize);
         const valueXRight = width - 37 - valueWidth;
@@ -235,7 +349,7 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
             Math.abs(data?.spending_summary?.breakdown?.betting_lottery || 0),
             Math.abs(data?.spending_summary?.breakdown?.doctors_therapists || 0)
         );
-        const barWidth = Math.max(10, (Math.abs(value) / (maxSpendingValue || 1)) * 318);
+        const barWidth = safeBarWidth(value, maxSpendingValue, 318, 10);
         secondPage.drawRectangle({ x: 161, y, width: barWidth, height: 7, radius: 6, color: COLORS.capitecBlue });
         const valueWidth = fontBold.widthOfTextAtSize(formatNumberToCurrency(value) || '', fontSize);
         const valueXRight = width - 37 - valueWidth;
@@ -250,18 +364,19 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
     const rowLightGray = rgb(0.91, 0.91, 0.91);
     const rowWhite = rgb(1, 1, 1);
     let currentY = startY + 60;
-
-    data?.scheduled_payments?.debit_orders?.forEach((item, idx) => {
+    let currentYB = startY + 60;
+    data?.scheduled_payments?.debit_orders?.slice(0, 4)?.forEach((item, idx) => {
         const rowHeight = 12;
         const rowY = currentY - rowHeight;
         const isEvenRow = idx % 2 !== 0;
         const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
+        const amountNum = isFinite(item?.amount) ? item.amount : 0;
         secondPage.drawRectangle({ x: tableOffsetX, y: rowY, width: 252, height: rowHeight, color: backgroundColor });
-        secondPage.drawText(item.date, { x: colDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
-        secondPage.drawText(item.description, { x: colDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(safeText(item?.date), { x: colDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(safeText(item?.description?.slice(0, 43)), { x: colDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
 
         // Amount (Money Out)
-        const amountText = formatNumberToCurrency(item.amount);
+        const amountText = formatNumberToCurrency(amountNum);
         const amountWidth = fontBold.widthOfTextAtSize(amountText, fontSize);
         secondPage.drawText(amountText, { x: width - 310 - amountWidth, y: rowY + 4, size: fontSize, font: fontBold, color: COLORS.darkColor });
 
@@ -273,29 +388,54 @@ export async function generateCapitecBankPDF(data: CapitecBankStatement) {
     const colBDescX = tableBOffsetX + 47;
     data?.scheduled_payments?.card_subscriptions?.forEach((item, idx) => {
         const rowHeight = 12;
-        const rowY = currentY - rowHeight + 24;
+        const rowY = currentYB - rowHeight;
         const isEvenRow = idx % 2 !== 0;
         const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
+        const amountNum = isFinite(item?.amount) ? item.amount : 0;
         secondPage.drawRectangle({ x: tableBOffsetX, y: rowY, width: 252, height: rowHeight, color: backgroundColor });
-        secondPage.drawText(item.date, { x: colBDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
-        secondPage.drawText(item.description, { x: colBDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(safeText(item?.date), { x: colBDateX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
+        secondPage.drawText(safeText(item?.description), { x: colBDescX, y: rowY + 4, size: fontSize, font, color: COLORS.darkColor });
 
         // Amount (Money Out)
-        const amountText = formatNumberToCurrency(item.amount);
+        const amountText = formatNumberToCurrency(amountNum);
         const amountWidth = fontBold.widthOfTextAtSize(amountText, fontSize);
         secondPage.drawText(amountText, { x: width - 37 - amountWidth, y: rowY + 4, size: fontSize, font: fontBold, color: COLORS.darkColor });
 
-        currentY -= rowHeight;
+        currentYB -= rowHeight;
     });
-    renderTable(secondPage, data.transaction_history, font, fontBold);
+    await renderTable(secondPage, data.transaction_history, font, fontBold, pdfDoc, TRANSACTION_START_Y_FIRST_PAGE);
+
+    // Page numbering (bottom-right, all pages including added ones)
+    const allPages = pdfDoc.getPages();
+    const totalPages = allPages.length;
+    const pageNumberFontSize = 7;
+    allPages.forEach((p, idx) => {
+        const { width: pWidth } = p.getSize();
+        const pageLabel = `Page ${idx + 1} of ${totalPages}`;
+        const labelWidth = fontBold.widthOfTextAtSize(pageLabel, pageNumberFontSize);
+        p.drawText(pageLabel, {
+            x: pWidth - 28.7 - labelWidth,
+            y: 14.5, // bottom padding
+            size: pageNumberFontSize,
+            font: fontBold,
+            color: COLORS.blackColor
+        });
+    });
+
     const pdfBytes = await pdfDoc.save();
-    fs.writeFileSync('./files/capitec/output.pdf', pdfBytes);
+    const finalOutputPath = outputPath || './files/capitec/output.pdf';
+    fs.writeFileSync(finalOutputPath, pdfBytes);
+    return finalOutputPath;
 }
 
-const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontBold: PDFFont) => {
+const renderTable = async (page: any, transactions: Transaction[], font: PDFFont, fontBold: PDFFont, pdfDoc: PDFDocument, startY: number) => {
+    const { width, height } = page.getSize();
+    const PAGE_BOTTOM_PADDING = 60;
+    const TRANSACTION_START_Y_ADDITIONAL_PAGES = height - 55;
+    const VAT_ROW_HEIGHT = 12;
+
     const MARGIN_RIGHT = 34.5;
     const MARGIN_LEFT = 34.5;
-    const { width } = page.getSize();
     const tableBOffsetX = MARGIN_LEFT;
     const tableWidth = width - MARGIN_LEFT - MARGIN_RIGHT;
 
@@ -307,24 +447,63 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
     const colMoneyOutX = colMoneyInX + 138;
     const colFeeX = colMoneyOutX + 40;
 
-    let currentY = 320;
+    let currentY = startY - 18;
     const fontSize = 7.99;
     const lineHeight = 12;
     const maxDescWidth = 180;
+    const maxCatWidth = 80;
     const rowLightGray = rgb(0.91, 0.91, 0.91);
     const rowWhite = rgb(1, 1, 1);
 
-    currentY -= lineHeight + 4;
+    const drawVatRow = (targetPage: any) => {
+        const rowHeight = VAT_ROW_HEIGHT;
+        const rowY = currentY - rowHeight + lineHeight;
+        // background
+        targetPage.drawRectangle({
+            x: tableBOffsetX,
+            y: rowY - 2,
+            width: tableWidth,
+            height: rowHeight,
+            color: rowWhite
+        });
+        const note = '* Includes VAT at 15%';
+        const noteWidth = font.widthOfTextAtSize(note, fontSize);
+        const noteY = rowY + rowHeight - fontSize - 3;
+        targetPage.drawText(note, {
+            x: width - MARGIN_RIGHT - noteWidth - 3.8,
+            y: noteY,
+            size: fontSize,
+            font,
+            color: COLORS.darkColor
+        });
+        currentY -= rowHeight;
+    };
 
-    transaction?.forEach((item, idx) => {
+    for (const [idx, item] of (transactions || []).entries()) {
         const isEvenRow = idx % 2 !== 0;
         const backgroundColor = isEvenRow ? rowLightGray : rowWhite;
 
         // Split description into lines
         const descText = item.description || '';
         const descLines = splitTextIntoLines(descText, maxDescWidth, font, fontSize);
-        const lineCount = Math.min(descLines.length, 3);
-        const rowHeight = lineHeight * Math.max(lineCount, 1);
+        const categoryText = item.category || '';
+        const catLines = splitTextIntoLines(categoryText, maxCatWidth, font, fontSize);
+        const lineCount = Math.max(Math.min(descLines.length, 3), Math.min(catLines.length, 3), 1);
+        const rowHeight = lineHeight * lineCount;
+
+        // Check if the row plus VAT note fits on the current page
+        if (currentY - rowHeight - VAT_ROW_HEIGHT < PAGE_BOTTOM_PADDING) {
+            // close current page with VAT row
+            drawVatRow(page);
+
+            // Add a new page using input2.pdf template
+            const input2Bytes = new Uint8Array(fs.readFileSync('./files/capitec/input2.pdf'));
+            const input2Pdf = await PDFDocument.load(input2Bytes);
+            const [newPage] = await pdfDoc.copyPages(input2Pdf, [0]);
+            pdfDoc.addPage(newPage);
+            page = newPage;
+            currentY = TRANSACTION_START_Y_ADDITIONAL_PAGES;
+        }
 
         const rowY = currentY - rowHeight + lineHeight;
 
@@ -361,18 +540,20 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
             });
         });
 
-        const categoryText = item.category || '';
-        page.drawText(categoryText, {
-            x: colCatX + 16,
-            y: firstLineY,
-            size: fontSize,
-            font,
-            color: COLORS.darkColor
+        catLines.slice(0, 3).forEach((line, lineIdx) => {
+            const lineY = firstLineY - lineIdx * lineHeight;
+            page.drawText(line, {
+                x: colCatX + 16,
+                y: lineY,
+                size: fontSize,
+                font,
+                color: COLORS.darkColor
+            });
         });
 
         // Money In
         if (item.money_in !== null && item.money_in !== undefined) {
-            const moneyInText = formatNumberToCurrency(item.money_in);
+            const moneyInText = formatNumberToCurrency(item.money_in, false);
             const moneyInWidth = font.widthOfTextAtSize(moneyInText, fontSize);
             page.drawText(moneyInText, {
                 x: width - MARGIN_RIGHT - (tableWidth - (colMoneyInX + 42)) - moneyInWidth,
@@ -385,7 +566,7 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
 
         // Money Out
         if (item.money_out !== null && item.money_out !== undefined) {
-            const moneyOutText = formatNumberToCurrency(item.money_out);
+            const moneyOutText = `${formatNumberToCurrency(item.money_out, false)}`;
             const moneyOutWidth = font.widthOfTextAtSize(moneyOutText, fontSize);
             page.drawText(moneyOutText, {
                 //x: colMoneyOutX + 40 - moneyOutWidth,
@@ -399,7 +580,7 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
 
         // Fee
         if (item.fee !== null && item.fee !== undefined) {
-            const feeText = formatNumberToCurrency(item.fee);
+            const feeText = formatNumberToCurrency(item.fee, false);
             const feeWidth = font.widthOfTextAtSize(feeText, fontSize);
             page.drawText(feeText, {
                 x: width - MARGIN_RIGHT - (tableWidth - (colFeeX - 37)) - feeWidth,
@@ -412,7 +593,7 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
 
         // Balance
         if (item.balance !== null && item.balance !== undefined) {
-            const balanceText = formatNumberToCurrency(item.balance);
+            const balanceText = formatNumberToCurrency(item.balance, false);
             const balanceWidth = font.widthOfTextAtSize(balanceText, fontSize);
             page.drawText(balanceText, {
                 x: width - MARGIN_RIGHT - balanceWidth - 2,
@@ -424,7 +605,10 @@ const renderTable = (page: any, transaction: Transaction[], font: PDFFont, fontB
         }
 
         currentY -= rowHeight;
-    });
+    }
+
+    // Close the last page with VAT note
+    drawVatRow(page);
 };
 
 function splitTextIntoLines(text: string, maxWidth: number, font: PDFFont, fontSize: number): string[] {

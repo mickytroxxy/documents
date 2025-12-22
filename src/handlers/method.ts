@@ -33,7 +33,6 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
     let months = 1;
     try {
         const userInfo = await authenticateUser(userPhone);
-        console.log(physicalAddress);
         if (userInfo?.length > 0) {
             const currentBalance = parseFloat(userInfo?.[0]?.balance);
             if (currentBalance >= parseFloat(totalCost)) {
@@ -58,7 +57,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
                 companyAddress,
                 companyEmail,
                 companyTel,
-                title: `${title}.`,
+                title: bankType === 'STANDARD' ? `${title}.` : `${title}`,
                 bankType: bankType?.toUpperCase(),
                 physicalAddress,
                 isPayslipIncluded

@@ -46,6 +46,7 @@ COPY files/fonts/ ./files/fonts/
 COPY files/tymebank/input.pdf ./files/tymebank/
 COPY files/tymebank/input2.pdf ./files/tymebank/
 COPY files/capitec/input.pdf ./files/capitec/
+COPY files/capitec/input2.pdf ./files/capitec/
 
 # Normalize font filename casing to match runtime expectations
 RUN if [ -f "./files/fonts/arial-Bold.ttf" ] && [ ! -f "./files/fonts/Arial-Bold.ttf" ]; then \

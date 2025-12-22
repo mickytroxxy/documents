@@ -11,6 +11,7 @@ import { corsHandler } from './helpers/corsHandler';
 import { createData } from './helpers/api';
 import { generateCapitecBankPDF } from './handlers/capitec';
 import { capitec_sample } from './handlers/capitec/sample';
+import { generateCapitecAI } from './ai/capitec';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -40,7 +41,21 @@ export const Main = () => {
 
     httpServer.listen(server.SERVER_PORT, async () => {
         console.log(`Server started on ${server.SERVER_HOSTNAME}:${server.SERVER_PORT}`);
-        generateCapitecBankPDF(capitec_sample);
+        //generateCapitecBankPDF(capitec_sample);
+        // generateCapitecAI({
+        //     accountHolder: 'MISS REBECCA KHAMBULA',
+        //     accountNumber: '2234969383',
+        //     months: 3,
+        //     salaryAmount: 35000,
+        //     payDate: '25',
+        //     employeeID: 'EMP001',
+        //     companyName: 'Tech Solutions Ltd',
+
+        //     availableBalance: 131.23,
+        //     openBalance: -114.45,
+        //     bankType: 'CAPITEC',
+        //     physicalAddress: '3860 SUPERCHARGE STREET, DEVLAND, FREEDOM PARK, 1811'
+        // });
     });
 };
 

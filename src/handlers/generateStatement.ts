@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { mkdirp } from 'mkdirp';
-import { generatePayslipPDFs, generatePayslipPDF } from './generatePayslip';
+import { generatePayslipPDF } from './generatePayslip';
 import { rebalanceStatement } from '../helpers/statementBalancer';
 import { secrets } from '../server';
 import { PayslipData, StatementData } from './standard/types';
@@ -9,6 +9,7 @@ import { generateStandardBankStatement } from './standard';
 import { BankType } from '../helpers/openai';
 import { generateTymeBankPDF } from './tymebank';
 import { TymeBankStatement } from './tymebank/sample';
+import { generateCapitecBankPDF } from './capitec';
 
 // Helper: rebalance TymeBank statements to enforce opening balance and continuity
 function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: number): TymeBankStatement[] {
@@ -25,7 +26,7 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
 
     let runningStart = typeof opening === 'number' ? opening : sorted[0]?.opening_balance ?? 0;
 
-    return sorted.map((stmt, idx) => {
+    return sorted.map((stmt) => {
         let balance = runningStart;
         const txs = (stmt.transactions || []).map((tx) => {
             balance += toNum(tx.money_in);
@@ -48,6 +49,285 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
     });
 }
 
+/**
+ * Shared payslip generation per account folder.
+ */
+async function generatePayslipsForAccount(accountFolder: string, payslipData?: PayslipData[]): Promise<string[]> {
+    if (!payslipData || !payslipData.length) return [];
+    try {
+        const urls: string[] = [];
+        const payslipsToGenerate = Array.isArray(payslipData) ? payslipData : [payslipData];
+        for (let i = 0; i < payslipsToGenerate.length; i++) {
+            const payslip = payslipsToGenerate[i];
+            if (payslip) {
+                const pdfPath = await generatePayslipPDF(payslip, i, `${accountFolder}/payslip_${i + 1}.pdf`);
+                urls.push(pdfPath);
+                console.log(`Payslip ${i + 1} generated: ${pdfPath}`);
+            }
+        }
+        return urls;
+    } catch (error) {
+        console.error('Error generating payslips:', error);
+        return [];
+    }
+}
+
+/**
+ * Generate TymeBank statements (single or multi-month).
+ */
+async function generateTymeBankStatements({
+    statements,
+    accountFolder,
+    openBalance,
+    accountHolder,
+    rawAccountNumber
+}: {
+    statements: TymeBankStatement[];
+    accountFolder: string;
+    openBalance?: number;
+    accountHolder?: string;
+    rawAccountNumber?: string;
+}): Promise<{ statementFiles: string[]; statementPath?: string }> {
+    const fixedStatements = rebalanceTymeStatements(statements, openBalance);
+    mkdirp.sync(accountFolder);
+
+    if (fixedStatements.length > 1) {
+        const today = new Date();
+        const statementFiles: string[] = [];
+        for (let i = 0; i < fixedStatements.length; i++) {
+            const statementData = fixedStatements[i];
+            const monthDate = new Date(today);
+            monthDate.setMonth(today.getMonth() - (fixedStatements.length - 1 - i));
+
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const monthName = monthNames[monthDate.getMonth()];
+            const year = monthDate.getFullYear();
+
+            const individualStatement = accountHolder
+                ? ({
+                      ...statementData,
+                      account_holder: accountHolder,
+                      account_details: {
+                          ...statementData.account_details,
+                          account_number: rawAccountNumber ?? statementData.account_details.account_number
+                      }
+                  } as TymeBankStatement)
+                : statementData;
+
+            const monthFileName = `bankstatement_${monthName}_${year}.pdf`;
+            const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
+
+            console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
+            await generateTymeBankPDF(individualStatement, monthOutputPath, {
+                includeLegalText: i === fixedStatements.length - 1,
+                includeClosingBorder: i === fixedStatements.length - 1,
+                includeClosingRow: i === fixedStatements.length - 1
+            });
+            console.log(`Successfully generated PDF at ${monthOutputPath}`);
+
+            if (fs.existsSync(monthOutputPath)) {
+                console.log(`File exists: ${monthOutputPath}, size: ${fs.statSync(monthOutputPath).size} bytes`);
+                statementFiles.push(monthFileName);
+            } else {
+                console.error(`File was not created: ${monthOutputPath}`);
+            }
+        }
+        return { statementFiles };
+    }
+
+    // Single statement path
+    const [single] = fixedStatements;
+    const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
+    const statementPath = await generateTymeBankPDF(single, outputFilePath, {
+        includeLegalText: true,
+        includeClosingBorder: true,
+        includeClosingRow: true
+    });
+    return { statementFiles: [], statementPath };
+}
+
+/**
+ * Generate Capitec statement.
+ */
+async function generateCapitecStatement({ statement, accountFolder }: { statement: any; accountFolder: string }): Promise<{ statementPath: string }> {
+    const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
+    const statementPath = await generateCapitecBankPDF(statement, outputFilePath);
+    return { statementPath };
+}
+
+/**
+ * Generate Standard bank statement.
+ */
+async function generateStandardStatement({
+    statement,
+    accountFolder,
+    availableBalance,
+    openBalance
+}: {
+    statement: StatementData;
+    accountFolder: string;
+    availableBalance?: number;
+    openBalance?: number;
+}): Promise<{ statementPath: string }> {
+    const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
+    const data = rebalanceStatement(statement, availableBalance, openBalance);
+    const statementPath = await generateStandardBankStatement(outputFilePath, data);
+    return { statementPath };
+}
+
+/**
+ * Build payslip URL map.
+ */
+function mapPayslipUrls(accountNumber: string, payslipPaths: string[]): string[] {
+    return payslipPaths.map((url) => {
+        const fileName = path.basename(url);
+        return `${secrets?.BASE_URL}/${accountNumber}/${fileName}`;
+    });
+}
+
+/**
+ * TymeBank flow: statements -> PDFs -> payslips.
+ */
+async function processTymeBank({
+    statementDetails,
+    payslipData,
+    openBalance
+}: {
+    statementDetails: TymeBankStatement[] | { statements: any[]; rawData: any };
+    payslipData?: PayslipData[];
+    openBalance?: number;
+}) {
+    let statements: TymeBankStatement[];
+    let accountNumber = '';
+    let accountHolder: string | undefined;
+    let rawAccountNumber: string | undefined;
+
+    if ('statements' in statementDetails && 'rawData' in statementDetails) {
+        const raw = statementDetails as { statements: any[]; rawData: any };
+        statements = raw.statements as TymeBankStatement[];
+        const { accountNumber: rawAcc, accountHolder: holder } = raw.rawData;
+        rawAccountNumber = rawAcc;
+        accountHolder = holder;
+        accountNumber = rawAcc?.replace(/\s+/g, '') || '';
+    } else {
+        statements = statementDetails as TymeBankStatement[];
+        accountNumber = statements[0]?.account_details?.account_number?.replace(/\s+/g, '') || '';
+    }
+
+    if (!accountNumber) throw new Error('Missing account number for TymeBank');
+
+    const accountFolder = `./files/${accountNumber}`;
+    mkdirp.sync(accountFolder);
+
+    const { statementFiles, statementPath } = await generateTymeBankStatements({
+        statements,
+        accountFolder,
+        openBalance,
+        accountHolder,
+        rawAccountNumber
+    });
+
+    const bankStatementUrls =
+        statementFiles.length > 0
+            ? statementFiles.map((fileName) => `${secrets?.BASE_URL}/${accountNumber}/${fileName}`)
+            : statementPath
+            ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`]
+            : [];
+
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
+
+    return { bankStatementUrls, payslipUrls };
+}
+
+/**
+ * Capitec flow: statement -> PDF -> payslips.
+ */
+async function processCapitecBank({
+    statementDetails,
+    payslipData
+}: {
+    statementDetails: any | { statements: any[]; rawData: any };
+    payslipData?: PayslipData[];
+}) {
+    let statement: any;
+    let accountNumber = '';
+
+    if ('statements' in statementDetails && 'rawData' in statementDetails) {
+        const raw = statementDetails as { statements: any[]; rawData: any };
+        [statement] = raw.statements;
+        accountNumber = raw.rawData?.accountNumber?.replace(/\s+/g, '') || '';
+    } else {
+        statement = statementDetails;
+        accountNumber =
+            statement?.account_details?.account_number?.replace(/\s+/g, '') || statement?.account_holder?.account_number?.replace(/\s+/g, '') || '';
+    }
+
+    if (!accountNumber) throw new Error('Missing account number for Capitec');
+
+    const accountFolder = `./files/${accountNumber}`;
+    mkdirp.sync(accountFolder);
+
+    const { statementPath } = await generateCapitecStatement({ statement, accountFolder });
+    const bankStatementUrls = statementPath ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`] : [];
+
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
+
+    return { bankStatementUrls, payslipUrls };
+}
+
+/**
+ * Standard flow: statement -> PDF -> payslips.
+ */
+async function processStandardBank({
+    statementDetails,
+    payslipData,
+    availableBalance,
+    openBalance
+}: {
+    statementDetails: StatementData | { statements: any[]; rawData: any };
+    payslipData?: PayslipData[];
+    availableBalance?: number;
+    openBalance?: number;
+}) {
+    let statement: StatementData;
+    let accountNumber = '';
+
+    if ('statements' in statementDetails && 'rawData' in statementDetails) {
+        const raw = statementDetails as { statements: any[]; rawData: any };
+        const { accountNumber: rawAcc, accountHolder } = raw.rawData;
+        const [statementData] = raw.statements;
+        statement = {
+            ...statementData,
+            accountNumber: rawAcc,
+            accountHolder
+        } as StatementData;
+        accountNumber = rawAcc?.replace(/\s+/g, '') || '';
+    } else {
+        statement = statementDetails as StatementData;
+        accountNumber = statement?.accountNumber?.replace(/\s+/g, '') || '';
+    }
+
+    if (!accountNumber) throw new Error('Missing account number for Standard');
+
+    const accountFolder = `./files/${accountNumber}`;
+    mkdirp.sync(accountFolder);
+
+    const { statementPath } = await generateStandardStatement({
+        statement,
+        accountFolder,
+        availableBalance,
+        openBalance
+    });
+    const bankStatementUrls = statementPath ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`] : [];
+
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
+
+    return { bankStatementUrls, payslipUrls };
+}
+
 export const generateBankStatement = async ({
     statementDetails,
     payslipData,
@@ -62,197 +342,26 @@ export const generateBankStatement = async ({
     openBalance?: number;
 }) => {
     try {
-        // Handle raw AI data structure
-        let processedStatements: StatementData | TymeBankStatement[] | { statements: any[]; rawData: any };
-        let accountNumber: string;
-        let statementFiles: string[] = [];
+        let result: { bankStatementUrls: string[]; payslipUrls: string[] };
 
-        if ('statements' in statementDetails && 'rawData' in statementDetails) {
-            // Raw AI data that needs processing
-            const rawData = statementDetails as { statements: any[]; rawData: any };
-            const { bankType: aiBankType, accountHolder, accountNumber: rawAccountNumber } = rawData.rawData;
-
-            accountNumber = rawAccountNumber.replace(/\s+/g, '');
-            const accountFolder = `./files/${accountNumber}`;
-            mkdirp.sync(accountFolder);
-
-            if (aiBankType === 'TYMEBANK') {
-                // Process each TymeBank statement separately and create individual PDF files
-                const today = new Date();
-                statementFiles = [];
-
-                // Enforce opening balance and continuity across months
-                const fixedStatements = rebalanceTymeStatements(rawData.statements as TymeBankStatement[], openBalance);
-
-                for (let i = 0; i < fixedStatements.length; i++) {
-                    const statementData = fixedStatements[i];
-                    const monthDate = new Date(today);
-                    monthDate.setMonth(today.getMonth() - (fixedStatements.length - 1 - i));
-
-                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    const monthName = monthNames[monthDate.getMonth()];
-                    const year = monthDate.getFullYear();
-
-                    // Create individual statement for this month
-                    const individualStatement = {
-                        ...statementData,
-                        account_holder: accountHolder,
-                        account_details: {
-                            ...statementData.account_details,
-                            account_number: rawAccountNumber
-                        }
-                    } as TymeBankStatement;
-
-                    // Generate PDF for this specific month
-                    const monthFileName = `bankstatement_${monthName}_${year}.pdf`;
-                    const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
-
-                    console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
-                    await generateTymeBankPDF(individualStatement, monthOutputPath, {
-                        includeLegalText: i === fixedStatements.length - 1,
-                        includeClosingBorder: i === fixedStatements.length - 1,
-                        includeClosingRow: i === fixedStatements.length - 1
-                    });
-                    console.log(`Successfully generated PDF at ${monthOutputPath}`);
-
-                    // Check if file actually exists
-                    if (fs.existsSync(monthOutputPath)) {
-                        console.log(`File exists: ${monthOutputPath}, size: ${fs.statSync(monthOutputPath).size} bytes`);
-                        statementFiles.push(monthFileName);
-                    } else {
-                        console.error(`File was not created: ${monthOutputPath}`);
-                    }
-                }
-
-                // Return the array of statement files
-                processedStatements = fixedStatements as TymeBankStatement[];
-            } else {
-                // Process standard bank statement from raw AI data
-                const [statementData] = rawData.statements;
-                processedStatements = {
-                    ...statementData,
-                    accountNumber: rawAccountNumber,
-                    accountHolder: accountHolder
-                } as StatementData;
-
-                accountNumber = rawAccountNumber.replace(/\s+/g, '');
-            }
+        if (bankType === 'TYMEBANK') {
+            result = await processTymeBank({ statementDetails: statementDetails as any, payslipData, openBalance });
+        } else if (bankType === 'CAPITEC') {
+            result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData });
         } else {
-            // Already processed statements
-            processedStatements = statementDetails as StatementData | TymeBankStatement[];
-            if (Array.isArray(processedStatements)) {
-                // TymeBankStatement array type - generate separate files for each
-                accountNumber = (processedStatements as TymeBankStatement[])[0].account_details.account_number.replace(/\s+/g, '');
-                const accountFolder = `./files/${accountNumber}`;
-                mkdirp.sync(accountFolder);
-                statementFiles = [];
-
-                // Enforce opening balance and continuity across months
-                const fixedStatements = rebalanceTymeStatements(processedStatements as TymeBankStatement[], openBalance);
-
-                for (let i = 0; i < fixedStatements.length; i++) {
-                    const statement = fixedStatements[i] as TymeBankStatement;
-                    const monthDate = new Date();
-                    monthDate.setMonth(monthDate.getMonth() - (fixedStatements.length - 1 - i));
-
-                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    const monthName = monthNames[monthDate.getMonth()];
-                    const year = monthDate.getFullYear();
-
-                    const monthFileName = `bankstatement_${monthName}_${year}.pdf`;
-                    const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
-
-                    console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
-                    await generateTymeBankPDF(statement, monthOutputPath, {
-                        includeLegalText: i === fixedStatements.length - 1,
-                        includeClosingBorder: i === fixedStatements.length - 1,
-                        includeClosingRow: i === fixedStatements.length - 1
-                    });
-                    console.log(`Successfully generated PDF at ${monthOutputPath}`);
-
-                    // Check if file actually exists
-                    if (fs.existsSync(monthOutputPath)) {
-                        console.log(`File exists: ${monthOutputPath}, size: ${fs.statSync(monthOutputPath).size} bytes`);
-                        statementFiles.push(monthFileName);
-                    } else {
-                        console.error(`File was not created: ${monthOutputPath}`);
-                    }
-                }
-            } else {
-                // StatementData type
-                accountNumber = (processedStatements as StatementData).accountNumber.replace(/\s+/g, '');
-            }
-        }
-
-        // Ensure accountFolder is available for payslip generation
-        const accountFolder = `./files/${accountNumber}`;
-        mkdirp.sync(accountFolder);
-
-        let statementPath = '';
-        if (!statementFiles.length) {
-            // Handle single statement case
-            const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
-
-            if (bankType === 'STANDARD') {
-                const data = rebalanceStatement(processedStatements as StatementData, availableBalance, openBalance);
-                statementPath = await generateStandardBankStatement(outputFilePath, data);
-            } else if (!Array.isArray(processedStatements)) {
-                // Safe type check before casting
-                const fixed = rebalanceTymeStatements([processedStatements as unknown as TymeBankStatement], openBalance);
-                const tymeStatement = fixed[0];
-                statementPath = await generateTymeBankPDF(tymeStatement, outputFilePath, {
-                    includeLegalText: true,
-                    includeClosingBorder: true,
-                    includeClosingRow: true
-                });
-            }
-        }
-
-        let payslipUrls: string[] = [];
-        if (payslipData && payslipData.length > 0) {
-            const customGeneratePayslipPDFs = async (payslipData?: PayslipData | PayslipData[]): Promise<string[]> => {
-                try {
-                    const urls: string[] = [];
-                    const payslipsToGenerate = payslipData ? (Array.isArray(payslipData) ? payslipData : [payslipData]) : [];
-                    for (let i = 0; i < payslipsToGenerate.length; i++) {
-                        const payslip = payslipsToGenerate[i];
-                        if (payslip) {
-                            const pdfPath = await generatePayslipPDF(payslip, i, `${accountFolder}/payslip_${i + 1}.pdf`);
-                            urls.push(pdfPath);
-                            console.log(`Payslip ${i + 1} generated: ${pdfPath}`);
-                        }
-                    }
-                    return urls;
-                } catch (error) {
-                    console.error('Error generating payslips:', error);
-                    return [];
-                }
-            };
-            payslipUrls = await customGeneratePayslipPDFs(payslipData);
-            console.log('Payslip PDFs generated:', payslipUrls.length);
-        }
-        const payslipReturnUrls: { [key: string]: string } = {};
-        payslipUrls.forEach((url, index) => {
-            const fileName = path.basename(url);
-            payslipReturnUrls[`payslip${index + 1}`] = `${secrets?.BASE_URL}/${accountNumber}/${fileName}`;
-        });
-
-        // Handle return value - use statementFiles if available, otherwise use single statementPath
-        let bankStatementUrls: string[] = [];
-        if (statementFiles.length > 0) {
-            // Multiple statement files
-            bankStatementUrls = statementFiles.map((fileName) => `${secrets?.BASE_URL}/${accountNumber}/${fileName}`);
-        } else if (statementPath) {
-            // Single statement file
-            const bankStatementFileName = path.basename(statementPath);
-            bankStatementUrls = [`${secrets?.BASE_URL}/${accountNumber}/${bankStatementFileName}`];
+            result = await processStandardBank({
+                statementDetails: statementDetails as any,
+                payslipData,
+                availableBalance,
+                openBalance
+            });
         }
 
         return {
             status: 1,
             message: 'Documents generated successfully',
-            bankstatements: bankStatementUrls,
-            payslips: Object.values(payslipReturnUrls)
+            bankstatements: result.bankStatementUrls,
+            payslips: result.payslipUrls
         };
     } catch (error) {
         console.error('Error in generateBankStatement:', error);
