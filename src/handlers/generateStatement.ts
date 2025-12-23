@@ -20,6 +20,25 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
     };
     const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+    const normalizeOpeningRow = (txs: TymeBankStatement['transactions'], openingBalance: number) => {
+        if (!txs || !txs.length) return txs;
+        const [first, ...rest] = txs;
+        const isOpeningRow = typeof first.description === 'string' && first.description.toLowerCase().includes('opening balance');
+
+        if (!isOpeningRow) return txs;
+
+        return [
+            {
+                ...first,
+                fees: '-',
+                money_out: '-',
+                money_in: '-',
+                balance: round2(openingBalance)
+            },
+            ...rest
+        ];
+    };
+
     // Sort statements by end date ascending to ensure chronological order
     const parseDate = (s: string) => new Date(s);
     const sorted = [...statements].sort((a, b) => parseDate(a.statement_period.to).getTime() - parseDate(b.statement_period.to).getTime());
@@ -27,16 +46,43 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
     let runningStart = typeof opening === 'number' ? opening : sorted[0]?.opening_balance ?? 0;
 
     return sorted.map((stmt) => {
-        let balance = runningStart;
-        const txs = (stmt.transactions || []).map((tx) => {
-            balance += toNum(tx.money_in);
-            balance -= toNum(tx.money_out);
-            balance -= toNum(tx.fees);
-            return { ...tx, balance: round2(balance) };
-        });
+        const txsWithOpening = normalizeOpeningRow(stmt.transactions, runningStart);
+
+        let balance = round2(runningStart);
+        const adjustedTxs: TymeBankStatement['transactions'] = [];
+
+        for (const tx of txsWithOpening || []) {
+            const moneyIn = toNum(tx.money_in);
+            const moneyOut = toNum(tx.money_out);
+            const fees = toNum(tx.fees);
+
+            // If a debit would exceed available funds (opening + same-line money in), add a smart top-up first
+            const totalDebit = moneyOut + fees;
+            const availableForDebit = balance + moneyIn;
+            if (totalDebit > availableForDebit) {
+                const needed = round2(totalDebit - availableForDebit);
+                const topUp: TymeBankStatement['transactions'][number] = {
+                    ...tx,
+                    description: 'Balance Top-up',
+                    money_in: needed,
+                    money_out: '-',
+                    fees: '-',
+                    balance: round2(balance + needed)
+                };
+                balance += needed;
+                adjustedTxs.push(topUp);
+            }
+
+            balance += moneyIn;
+            balance -= moneyOut;
+            balance -= fees;
+
+            adjustedTxs.push({ ...(tx as TymeBankStatement['transactions'][number]), balance: round2(balance) });
+        }
 
         const opening_balance = round2(runningStart);
         const closing_balance = round2(balance);
+
         // Next month's opening is this month's closing
         runningStart = closing_balance;
 
@@ -44,7 +90,7 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
             ...stmt,
             opening_balance,
             closing_balance,
-            transactions: txs
+            transactions: adjustedTxs
         } as TymeBankStatement;
     });
 }
@@ -245,10 +291,14 @@ async function processTymeBank({
  */
 async function processCapitecBank({
     statementDetails,
-    payslipData
+    payslipData,
+    openBalance,
+    availableBalance
 }: {
     statementDetails: any | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
+    openBalance?: number;
+    availableBalance?: number;
 }) {
     let statement: any;
     let accountNumber = '';
@@ -264,6 +314,34 @@ async function processCapitecBank({
     }
 
     if (!accountNumber) throw new Error('Missing account number for Capitec');
+
+    // Override balances with provided values
+    if (openBalance !== undefined) {
+        statement.balances = statement.balances || {};
+        statement.balances.opening_balance = openBalance;
+    }
+    if (availableBalance !== undefined) {
+        statement.balances = statement.balances || {};
+        statement.balances.closing_balance = availableBalance;
+        statement.balances.available_balance = availableBalance;
+    }
+
+    // Recalculate transaction balances to match the provided balances
+    if (statement.transaction_history && Array.isArray(statement.transaction_history)) {
+        let currentBalance = openBalance !== undefined ? openBalance : statement.balances?.opening_balance || 0;
+        statement.transaction_history.forEach((tx: any) => {
+            // money_in is positive, money_out and fee are negative in the data
+            currentBalance += tx.money_in || 0;
+            currentBalance += tx.money_out || 0; // negative
+            currentBalance += tx.fee || 0; // negative
+            tx.balance = currentBalance;
+        });
+        // Adjust the last balance to match availableBalance if provided
+        if (availableBalance !== undefined && statement.transaction_history.length > 0) {
+            const lastTx = statement.transaction_history[statement.transaction_history.length - 1];
+            lastTx.balance = availableBalance;
+        }
+    }
 
     const accountFolder = `./files/${accountNumber}`;
     mkdirp.sync(accountFolder);
@@ -347,7 +425,7 @@ export const generateBankStatement = async ({
         if (bankType === 'TYMEBANK') {
             result = await processTymeBank({ statementDetails: statementDetails as any, payslipData, openBalance });
         } else if (bankType === 'CAPITEC') {
-            result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData });
+            result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData, openBalance, availableBalance });
         } else {
             result = await processStandardBank({
                 statementDetails: statementDetails as any,

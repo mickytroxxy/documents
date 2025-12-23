@@ -114,9 +114,9 @@ export const capitec_sample: CapitecBankStatement = {
         to_date: '18/10/2025'
     },
     balances: {
-        opening_balance: -114.45,
-        closing_balance: 131.23,
-        available_balance: 1.23
+        opening_balance: 0,
+        closing_balance: 0,
+        available_balance: 0
     },
     money_in_summary: {
         total: 99544.79,

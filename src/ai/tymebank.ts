@@ -28,12 +28,18 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
     let currentBalance = openBalance;
 
     for (let i = 0; i < months; i++) {
-        // Calculate date ranges for each month - working FORWARDS from earliest to latest
+        // Calculate 30-day periods backwards from today
+        const daysPerPeriod = 30;
+        const totalDays = months * daysPerPeriod;
         const startDate = new Date(today);
-        startDate.setMonth(today.getMonth() - months + 1 + i);
+        startDate.setDate(today.getDate() - totalDays + i * daysPerPeriod);
         const endDate = new Date(startDate);
-        endDate.setMonth(startDate.getMonth() + 1);
-        endDate.setDate(0); // Last day of month
+        endDate.setDate(startDate.getDate() + daysPerPeriod - 1);
+
+        // For the last period, ensure it ends on today
+        if (i === months - 1) {
+            endDate.setTime(today.getTime());
+        }
 
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const startMonth = monthNames[startDate.getMonth()];
@@ -41,9 +47,12 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
         const startYear = startDate.getFullYear();
         const endYear = endDate.getFullYear();
 
+        const startDay = startDate.getDate().toString().padStart(2, '0');
+        const endDay = endDate.getDate().toString().padStart(2, '0');
+
         const statementPeriod = {
-            from: `01 ${startMonth} ${startYear}`,
-            to: `31 ${endMonth} ${endYear}`,
+            from: `${startDay} ${startMonth} ${startYear}`,
+            to: `${endDay} ${endMonth} ${endYear}`,
             generation_date: today.toISOString().split('T')[0]
         };
 
@@ -61,7 +70,8 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
             totalMonths: months,
             openingBalance: currentBalance, // carried-over balance
             physicalAddress,
-            companyName
+            companyName,
+            isLastMonth: i === months - 1
         };
 
         const monthlyUserMessage = generateTymeBankPrompt(monthlyPromptData);
@@ -93,18 +103,38 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
                 // Recalculate balances after removing opening balance transaction
                 if (statementData.transactions.length > 0) {
                     let recalculatedBalance = currentBalance;
+                    const adjustedTransactions: any[] = [];
                     statementData.transactions.forEach((tx: any) => {
-                        if (tx.money_in !== '-' && tx.money_in !== null) {
-                            recalculatedBalance += parseFloat(tx.money_in);
+                        const moneyIn = tx.money_in !== '-' && tx.money_in !== null ? parseFloat(tx.money_in) : 0;
+                        const moneyOut = tx.money_out !== '-' && tx.money_out !== null ? parseFloat(tx.money_out) : 0;
+                        const fees = tx.fees !== '-' && tx.fees !== null ? parseFloat(tx.fees) : 0;
+
+                        // Prevent balance from going negative by adding top-up if needed
+                        const totalDebit = moneyOut + fees;
+                        const availableAfterIn = recalculatedBalance + moneyIn;
+                        if (availableAfterIn < totalDebit) {
+                            const needed = Math.ceil((totalDebit - availableAfterIn) * 100) / 100; // Round up to 2 decimals
+                            const descriptions = ['EFT from Client', 'Freelance Payment', 'Side Business Income', 'Refund Received', 'Gift Money'];
+                            const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)];
+                            const topUp: any = {
+                                date: tx.date,
+                                description: randomDesc,
+                                fees: '-',
+                                money_in: needed.toFixed(2),
+                                money_out: '-',
+                                balance: (recalculatedBalance + needed).toFixed(2)
+                            };
+                            adjustedTransactions.push(topUp);
+                            recalculatedBalance += needed;
                         }
-                        if (tx.money_out !== '-' && tx.money_out !== null) {
-                            recalculatedBalance -= parseFloat(tx.money_out);
-                        }
-                        if (tx.fees !== '-' && tx.fees !== null) {
-                            recalculatedBalance -= parseFloat(tx.fees);
-                        }
-                        tx.balance = recalculatedBalance;
+
+                        recalculatedBalance += moneyIn;
+                        recalculatedBalance -= moneyOut;
+                        recalculatedBalance -= fees;
+                        tx.balance = recalculatedBalance.toFixed(2);
+                        adjustedTransactions.push(tx);
                     });
+                    statementData.transactions = adjustedTransactions;
                     statementData.closing_balance = recalculatedBalance;
 
                     // Add closing balance as a final transaction

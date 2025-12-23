@@ -88,7 +88,7 @@ Use these EXACT totals:
 • Creating a transaction that would cause insufficient funds
 
 THIS IS A HARD FAILURE CONDITION.
-If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
+If currentBalance < payment amount → YOU MUST ADD DEPOSITS FIRST TO COVER THE PAYMENT BEFORE MAKING THE PAYMENT.
 
 ================================================================
 DATE & SALARY RULES
@@ -131,6 +131,7 @@ Rules:
 • SAME amount every month
 • NEVER mark rent as income
 • NEVER use "RENTAL INCOME"
+> NO PAYMENT THAT IS BIGGER THAN THE OPEN BALANCE MUST HAPPEN, OPENING BALANCE SHOULD BE TREATED AS CURRENT BALANCE. IF OPENING BALANCE IS 300, THE FIRST TRANSACTION CAN NOT BE A MONEY OUT OF MORE THAN 300 UNLESS ITS A FEE.
 
 ================================================================
 CARD PURCHASE CLASSIFICATION (MANDATORY)
@@ -298,7 +299,8 @@ export const generateTymeBankPrompt = ({
     currentMonth,
     totalMonths,
     openingBalance,
-    physicalAddress
+    physicalAddress,
+    isLastMonth = false
 }: GenerateDocs & {
     statementPeriod?: { from: string; to: string; generation_date: string };
     currentMonth?: number;
@@ -306,6 +308,7 @@ export const generateTymeBankPrompt = ({
     openingBalance?: number;
     physicalAddress: string;
     companyName: string;
+    isLastMonth?: boolean;
 }) => {
     const currentDate = new Date();
     const fromDate = new Date();
@@ -331,12 +334,26 @@ IMPORTANT:
 
 🚫 YOU ARE STRICTLY FORBIDDEN FROM:
 • Making any payment that exceeds the CURRENT balance
+• NO PAYMENT THAT IS BIGGER THAN THE OPEN BALANCE MUST HAPPEN, OPENING BALANCE SHOULD BE TREATED AS CURRENT BALANCE. IF OPENING BALANCE IS 300, THE FIRST TRANSACTION CAN NOT BE A MONEY OUT OF MORE THAN 300 UNLESS ITS A FEE.
 • Allowing the balance to go negative at ANY point
 • Creating a transaction that would cause insufficient funds
-. No repeated fees in a row. fees should be next to a real transaction
+• No repeated fees in a row. fees should be next to a real transaction
 
 THIS IS A HARD FAILURE CONDITION.
-If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
+If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT AMOUNT TO EQUAL THE CURRENT BALANCE OR ADD A DEPOSIT BEFORE THE PAYMENT.
+NO PAYMENT THAT IS BIGGER THAN THE OPEN BALANCE MUST HAPPEN, OPENING BALANCE SHOULD BE TREATED AS CURRENT BALANCE. IF OPENING BALANCE IS 300, THE FIRST TRANSACTION CAN NOT BE A MONEY OUT OF MORE THAN 300 UNLESS ITS A FEE.
+
+CRITICAL BALANCE ENFORCEMENT:
+- Initialize currentBalance = opening_balance
+- Process transactions in STRICT chronological order (by date)
+- For each transaction:
+  - Add money_in to currentBalance
+  - Subtract money_out from currentBalance (but ONLY if currentBalance >= money_out, otherwise add a deposit before the transaction to cover it)
+  - Subtract fees from currentBalance
+- Balance MUST NEVER go below 0. If it would, add a realistic deposit transaction before the problematic transaction.
+- Large money_out transactions like rent must be the full amount; add deposits earlier in the month if needed to cover them.
+- Every month MUST have a rent payment between the 1st and 3rd, even if it requires adding income first.
+- Rent amount must be realistic (20-40% of salary) and consistent every month.
 Core Input Data:
 - account_holder: "${accountHolder}"
 - account_number: "${accountNumber}",
@@ -344,7 +361,7 @@ Core Input Data:
 - statement_period_to: "${periodTo}"
 - statement_period_generation_date: "${generationDate}"
 - opening_balance: ${openingBalance?.toFixed(2) || openBalance.toFixed(2)}
-- closing_balance: ${availableBalance.toFixed(2)}
+${isLastMonth ? ` - closing_balance: ${availableBalance.toFixed(2)}` : ''}
 - salary_amount: ${salaryAmount.toFixed(2)}, paid monthly on day ${payDate}
 ${currentMonth && totalMonths ? `- This is month ${currentMonth} of ${totalMonths} in the series` : ''}
 
@@ -355,17 +372,16 @@ Transaction Rules:
 4. Include realistic merchant names used in South Africa.
 5. Include bank-related transactions where appropriate (ATM withdrawal fees, immediate EFT fees, etc.).
 6. Each month must contain AT LEAST 15 transactions and no more than 25 transactions.
-7. NO future dates.
-8. The running balance MUST be updated after every transaction.
-9. The first transaction should NOT be "Opening Balance" - start with actual transactions.
+7. NO more than 5 transactions per day (some days may have 0).
+8. NO future dates.
+9. The running balance MUST be updated after every transaction.
+10. The first transaction should NOT be "Opening Balance" - start with actual transactions.
 
-MANDATORY FEE RULE (VERY IMPORTANT):
-TymeBank does NOT charge for card purchases.
-TymeBank ONLY charges for SMS notifications.
+MANDATORY FEE RULE:
+TymeBank charges R0.50 for transactional SMS notifications on every purchase.
 
 Therefore:
-- For EVERY purchase transaction (money_out),
-  you MUST immediately generate a SECOND transaction object:
+- For EVERY purchase transaction (money_out > 0), you MUST immediately generate a fee transaction after it:
 
    {
      "date": "same date",
@@ -377,8 +393,8 @@ Therefore:
    }
 
 - DO NOT combine fees with the main purchase.
-- The fee must ALWAYS appear as its own standalone transaction.
-- This applies to ANY POS purchase, online purchase, petrol station purchase, grocery store, clothing, restaurant, etc.
+- DO NOT generate standalone fee transactions without a preceding purchase on the same date.
+- Every fee must be paired with a money_out transaction immediately before it.
 
 Additional TymeBank Fees You MAY apply (only when logically relevant):
 - Cash withdrawal at SA ATM: R10 per R1,000 or part thereof (separate fee transaction)
@@ -390,7 +406,7 @@ Additional TymeBank Fees You MAY apply (only when logically relevant):
 - International ATM balance enquiry: R70
 - Debit card or debit order decline: R3
 - Include a consistent, significant rent payment between the 1st and 3rd of each month, shortly after the salary is paid.
-- Add other income sources besides salary. Use descriptions like 'Freelance Income', 'EFT from Client', or 'Side Business Revenue' to make the statement look stronger and more credible.
+- Add other income sources besides salary with varied, realistic South African descriptions to make the statement look stronger and more credible. Examples include payments from clients, freelance work, side businesses, refunds, gifts, etc. Avoid repeating the same descriptions.
 
 JSON STRUCTURE (return ONLY valid JSON in this exact structure):
 
@@ -504,7 +520,7 @@ STATEMENT PERIOD: ${fromDateStr} to ${toDateStr} (${months} months)
 • Dates MAY repeat (multiple transactions per day REQUIRED)
 • DO NOT generate 1 transaction per day
 • Some days must have 0 transactions
-• Some days must have 2–5 transactions
+• Some days must have 0-5 transactions, but NO more than 5 transactions per day
 
 Salary:
 • Paid on the ${payDate}th of each month
@@ -522,7 +538,7 @@ FINANCIAL PARAMETERS
 • Required Final Balance: R${availableBalance.toFixed(2)}
 • Monthly Salary: R${salaryAmount.toFixed(2)}
 • Monthly Rent: R${rentAmount.toFixed(2)}
-
+. NO PAYMENT THAT IS BIGGER THAN THE OPEN BALANCE MUST HAPPEN, OPENING BALANCE SHOULD BE TREATED AS CURRENT BALANCE. IF OPENING BALANCE IS 300, THE FIRST TRANSACTION CAN NOT BE A MONEY OUT OF MORE THAN 300 UNLESS ITS A FEE.
 =================================================================
 CRITICAL PAYMENT & FEE RULES (MUST FOLLOW EXACTLY)
 =================================================================
