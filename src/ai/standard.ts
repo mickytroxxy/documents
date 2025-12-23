@@ -7,7 +7,18 @@ import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared
  * Generate Standard bank statement data (single statement)
  */
 export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialDataResponse> => {
-    const { accountHolder, payDate, accountNumber, months = 3, openBalance, availableBalance, salaryAmount, physicalAddress, companyName } = data;
+    const {
+        accountHolder,
+        payDate,
+        accountNumber,
+        months = 3,
+        openBalance,
+        availableBalance,
+        salaryAmount,
+        physicalAddress,
+        companyName,
+        comment
+    } = data;
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
@@ -30,7 +41,8 @@ export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialD
         availableBalance,
         salaryAmount,
         physicalAddress,
-        companyName
+        companyName,
+        comment
     });
 
     const completion = await deepseek.chat.completions.create({
@@ -48,7 +60,20 @@ export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialD
     });
 
     const content = completion.choices?.[0]?.message?.content || '{}';
-    const responseData = parseJSONResponse(content);
+    let responseData = parseJSONResponse(content);
+
+    // Recalculate balances to ensure they are correct
+    if (responseData.transactions && Array.isArray(responseData.transactions)) {
+        let currentBalance = openBalance;
+        responseData.transactions.forEach((tx: any) => {
+            const deposit = parseFloat(tx.deposit?.replace(/,/g, '') || '0');
+            const payment = parseFloat(tx.payment?.replace(/,/g, '') || '0');
+            currentBalance += deposit;
+            currentBalance -= payment;
+            tx.balance = currentBalance.toFixed(2);
+        });
+        responseData.summary.availableBalance = currentBalance.toFixed(2);
+    }
 
     return {
         status: 1,

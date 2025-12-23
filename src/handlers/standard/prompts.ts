@@ -29,8 +29,9 @@ export const formStatementPrompt = ({
     physicalAddress,
     fromDate,
     toDate,
-    companyName
-}: FormStatementPrompt) => {
+    companyName,
+    comment
+}: FormStatementPrompt & { comment?: string }) => {
     const totalPayments = averageMonthlySpending * months;
     const totalDeposits = availableBalance - openBalance + totalPayments;
 
@@ -45,11 +46,11 @@ export const formStatementPrompt = ({
         month: '2-digit',
         year: 'numeric'
     });
-
-    return `
+    console.log(availableBalance);
+    let prompt = `
 You are a South African bank-statement generator.
 Your output MUST be mathematically perfect, internally consistent,
-and suitable for loan approval. 
+and suitable for loan approval.
 The user works at ${companyName} so your salary deposits mainDescription can include the name
 ================================================================
 ABSOLUTE DATE CONSTRAINT (HARD RULE)
@@ -68,8 +69,8 @@ accountNumber: "${accountNumber}"
 periodMonths: ${months}
 openingBalance: ${openBalance.toFixed(2)}
 
-REQUIRED FINAL availableBalance (MUST MATCH EXACTLY):
-${availableBalance.toFixed(2)}
+***SERIOUS REQUIREMENT - FINAL BALANCE MUST BE:***
+availableBalance: ${availableBalance.toFixed(2)}
 
 ================================================================
 BALANCE INVARIANT (CRITICAL — DO NOT VIOLATE)
@@ -89,6 +90,13 @@ Use these EXACT totals:
 
 THIS IS A HARD FAILURE CONDITION.
 If currentBalance < payment amount → YOU MUST ADD DEPOSITS FIRST TO COVER THE PAYMENT BEFORE MAKING THE PAYMENT.
+
+================================================================
+***SERIOUS REQUIREMENT - FINAL TRANSACTION BALANCE***
+================================================================
+***THE LAST BALANCE OF THE LAST TRANSACTION MUST BE THE AVAILABLE BALANCE: ${availableBalance.toFixed(2)}***
+***THIS IS NOT A SUGGESTION - THIS IS A HARD REQUIREMENT***
+***THE FINAL TRANSACTION'S BALANCE FIELD MUST EQUAL ${availableBalance.toFixed(2)}***
 
 ================================================================
 DATE & SALARY RULES
@@ -154,7 +162,7 @@ FOR EVERY INTERNATIONAL CARD PURCHASE:
 2️⃣ IMMEDIATELY AFTER create a FEE transaction:
 
 payment: 11.83
-mainDescription: "FEE: INTERNATIONAL TRANSACTION"
+mainDescription: "FEE:INTERNATIONAL TRANSACTION"
 subDescription: "FEE: INTERNATIONAL TRANSACTION"
 ALL SALARY DEPOSIT, incoming funds not through ATM deposits must have a subDescription of PAYMENT FROM.
 
@@ -227,7 +235,7 @@ PROGRESSIVE BALANCING (STRICT — NEW)
 ================================================================
 You MUST achieve the final availableBalance progressively.
 
-🚫 NEVER use a single large deposit or payment to “fix” the balance.
+🚫 NEVER use a single large deposit or payment to "fix" the balance.
 🚫 NEVER insert obvious balancing transactions.
 🚫 NEVER adjust more than 15–25% of the remaining balance gap in one transaction.
 
@@ -246,6 +254,8 @@ By the FINAL WEEK:
 • Final transactions must appear routine and unsuspicious
 • The last transaction MUST NOT look like an adjustment
 
+***REMEMBER: THE FINAL BALANCE AFTER THE LAST TRANSACTION MUST BE ${availableBalance.toFixed(2)}***
+
 This MUST look like natural financial behaviour over time.
 
 ================================================================
@@ -261,8 +271,9 @@ For EACH transaction (chronological):
 🚫 At NO POINT may currentBalance drop below 0
 🚫 Payments MUST NEVER exceed currentBalance
 
-FINAL currentBalance MUST EQUAL:
-${availableBalance.toFixed(2)}
+***SERIOUS FINAL BALANCE REQUIREMENT:***
+***FINAL currentBalance (after LAST transaction) MUST EQUAL:***
+***${availableBalance.toFixed(2)}***
 
 ================================================================
 OUTPUT REQUIREMENTS
@@ -275,6 +286,9 @@ OUTPUT REQUIREMENTS
 • address:"${physicalAddress}" in this format ['Address:', '3860 SUPERCHARGER ST', 'Devland Ext', 'Freedom Park', '1832', 'ZA']
 Please use the physical address ${physicalAddress}
 
+***CRITICAL FINAL CHECK:***
+***Transaction #${transactionCount}'s balance field MUST BE ${availableBalance.toFixed(2)}***
+
 REFERENCE STRUCTURE:
 ${JSON.stringify(sampleStatementData, null, 2)}
 
@@ -282,9 +296,17 @@ FINAL VALIDATION STEP (MANDATORY):
 Before returning JSON:
 ✔ Validate running balance
 ✔ Validate no overdrafts
-✔ Validate final balance EXACT MATCH
+✔ ***Validate final balance is EXACTLY ${availableBalance.toFixed(2)}***
 ✔ Fix any violations BEFORE returning
+
+***FAILURE TO MAKE THE LAST TRANSACTION BALANCE ${availableBalance.toFixed(2)} WILL RESULT IN INVALID OUTPUT***
 `;
+
+    if (comment) {
+        prompt += `\n\nADDITIONAL USER REQUIREMENTS: ${comment}`;
+    }
+
+    return prompt;
 };
 
 export const generateTymeBankPrompt = ({
@@ -300,7 +322,8 @@ export const generateTymeBankPrompt = ({
     totalMonths,
     openingBalance,
     physicalAddress,
-    isLastMonth = false
+    isLastMonth = false,
+    comment
 }: GenerateDocs & {
     statementPeriod?: { from: string; to: string; generation_date: string };
     currentMonth?: number;
@@ -309,6 +332,7 @@ export const generateTymeBankPrompt = ({
     physicalAddress: string;
     companyName: string;
     isLastMonth?: boolean;
+    comment?: string;
 }) => {
     const currentDate = new Date();
     const fromDate = new Date();
@@ -320,7 +344,7 @@ export const generateTymeBankPrompt = ({
     let generationDate =
         statementPeriod?.generation_date || currentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    return `You are a financial-data generator for TymeBank statements. Your goal is to create a bank statement that is convincing enough for a vehicle, house, or loan application. Produce strictly valid JSON with realistic, chronological, and fully balanced TymeBank transaction data.
+    let prompt = `You are a financial-data generator for TymeBank statements. Your goal is to create a bank statement that is convincing enough for a vehicle, house, or loan application. Produce strictly valid JSON with realistic, chronological, and fully balanced TymeBank transaction data.
 
 IMPORTANT:
 - Today's date is ${currentDate.toLocaleDateString('en-GB')}.
@@ -462,6 +486,12 @@ CRITICAL REQUIREMENTS:
 - No invalid numbers.
 - All fields strictly follow the format above.
 - Output ONLY the JSON.`;
+
+    if (comment) {
+        prompt += `\n\nADDITIONAL USER REQUIREMENTS: ${comment}`;
+    }
+
+    return prompt;
 };
 
 export const formCapitecTransactionsPrompt = ({
@@ -473,8 +503,9 @@ export const formCapitecTransactionsPrompt = ({
     payDate,
     salaryAmount = 20000,
     companyName,
-    physicalAddress
-}: FormStatementPrompt) => {
+    physicalAddress,
+    comment
+}: FormStatementPrompt & { comment?: string }) => {
     const rentMin = salaryAmount * 0.15;
     const rentMax = salaryAmount * 0.2;
     const rentAmount = Math.floor(Math.random() * (rentMax - rentMin + 1)) + rentMin;
@@ -497,7 +528,7 @@ export const formCapitecTransactionsPrompt = ({
     const fromDateStr = formatDate(fromDate);
     const toDateStr = formatDate(toDate);
 
-    return `
+    let prompt = `
 You are a South African Capitec Bank transaction generator.
 Generate ONLY realistic transaction data for a Capitec bank statement.
 
@@ -789,5 +820,12 @@ AND YOUR RESPONSE MUST BE LIKE:
 
 Calculate balances correctly through all ${transactionCount} transactions.
 Use ONLY realistic Capitec transaction descriptions.
+
 `;
+
+    if (comment) {
+        prompt += `\n\nADDITIONAL USER REQUIREMENTS: ${comment}`;
+    }
+
+    return prompt;
 };

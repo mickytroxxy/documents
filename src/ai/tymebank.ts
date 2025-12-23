@@ -8,7 +8,18 @@ import { TymeBankStatement } from '../handlers/tymebank/sample';
  * Generate TymeBank statement data (multi-month sequence)
  */
 export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialDataResponse> => {
-    const { accountHolder, salaryAmount, payDate, accountNumber, months = 3, openBalance, availableBalance, physicalAddress, companyName } = data;
+    const {
+        accountHolder,
+        salaryAmount,
+        payDate,
+        accountNumber,
+        months = 3,
+        openBalance,
+        availableBalance,
+        physicalAddress,
+        companyName,
+        comment
+    } = data;
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
@@ -71,7 +82,8 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
             openingBalance: currentBalance, // carried-over balance
             physicalAddress,
             companyName,
-            isLastMonth: i === months - 1
+            isLastMonth: i === months - 1,
+            comment
         };
 
         const monthlyUserMessage = generateTymeBankPrompt(monthlyPromptData);

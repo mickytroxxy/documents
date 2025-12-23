@@ -17,6 +17,7 @@ export interface GenerateDocs {
     salaryAmount?: number;
     bankType?: BankType;
     companyName: string;
+    comment?: string;
 }
 
 export interface FinancialDataResponse {

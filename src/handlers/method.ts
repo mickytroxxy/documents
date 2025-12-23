@@ -28,7 +28,8 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         physicalAddress,
         isPayslipIncluded,
         userPhone,
-        totalCost
+        totalCost,
+        comment
     } = req.body;
     let months = 1;
     try {
@@ -60,7 +61,8 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
                 title: bankType === 'STANDARD' ? `${title}.` : `${title}`,
                 bankType: bankType?.toUpperCase(),
                 physicalAddress,
-                isPayslipIncluded
+                isPayslipIncluded,
+                comment
             });
             res.status(200).json(response);
             console.log(response);
