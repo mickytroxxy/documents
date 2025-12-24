@@ -216,6 +216,9 @@ async function generateStandardStatement({
     openBalance?: number;
 }): Promise<{ statementPath: string }> {
     const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
+    console.log(statement?.transactions?.[statement?.transactions?.length - 2]);
+    console.log(statement?.transactions?.pop());
+    console.log(availableBalance);
     const data = rebalanceStatement(statement, availableBalance, openBalance);
     const statementPath = await generateStandardBankStatement(outputFilePath, data);
     return { statementPath };
