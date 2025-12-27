@@ -12,6 +12,8 @@ import { createData } from './helpers/api';
 import { generateCapitecBankPDF } from './handlers/capitec';
 import { capitec_sample } from './handlers/capitec/sample';
 import { generateCapitecAI } from './ai/capitec';
+import { generateFNBBankPDF } from './handlers/fnb';
+import { fnb_sample_statement } from './handlers/fnb/sample';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -56,6 +58,8 @@ export const Main = () => {
         //     bankType: 'CAPITEC',
         //     physicalAddress: '3860 SUPERCHARGE STREET, DEVLAND, FREEDOM PARK, 1811'
         // });
+
+        generateFNBBankPDF(fnb_sample_statement);
     });
 };
 

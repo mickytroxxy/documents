@@ -14,7 +14,9 @@ export const COLORS = {
     blackColor: rgb(0, 0, 0),
     stampColor: rgb(0.35, 0.35, 0.35),
     capitecBlue: rgb(0.1, 0.6, 0.9),
-    capitecTomato: rgb(0.9804, 0.0941, 0.149)
+    capitecTomato: rgb(0.9804, 0.0941, 0.149),
+    fnbBlue: rgb(0, 90 / 255, 155 / 255)
+    // ≈ rgb(0, 0.306, 0.608)
 };
 
 export const TABLE_CONFIG = {
