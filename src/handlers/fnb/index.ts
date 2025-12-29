@@ -46,11 +46,19 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
 
     // Constants for pagination
     const TRANSACTIONS_PER_PAGE_FIRST = Math.floor((TRANSACTION_START_Y_FIRST_PAGE - PAGE_BOTTOM_PADDING) / 10);
-    const TRANSACTIONS_PER_PAGE_ADDITIONAL = Math.floor((TRANSACTION_START_Y_ADDITIONAL_PAGES - PAGE_BOTTOM_PADDING) / 10);
     const totalTransactions = data.transactions.length;
-    const remainingTransactions = totalTransactions - TRANSACTIONS_PER_PAGE_FIRST;
-    const additionalPagesNeeded = Math.ceil(remainingTransactions / TRANSACTIONS_PER_PAGE_ADDITIONAL);
-    const totalPagesNeeded = additionalPagesNeeded + 1;
+
+    // Calculate total pages by simulating pagination with different limits per startY
+    let tempIndex = TRANSACTIONS_PER_PAGE_FIRST;
+    let tempPageIndex = 1;
+    let totalPages = 1;
+    while (tempIndex < totalTransactions) {
+        const startY = tempPageIndex % 2 === 1 ? 767 : 675;
+        const transactionsPerPage = Math.floor((startY - PAGE_BOTTOM_PADDING) / 10);
+        tempIndex += transactionsPerPage;
+        totalPages++;
+        tempPageIndex++;
+    }
 
     const { height, width } = firstPage.getSize();
     const { height: secondPageHeight, width: secondPageWidth } = firstPage.getSize();
@@ -169,70 +177,56 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
             color: COLORS.blackColor
         });
     });
+    // Render first page
+    const firstPageTransactions = data.transactions.slice(0, TRANSACTIONS_PER_PAGE_FIRST);
+    await renderTable(
+        firstPage,
+        firstPageTransactions,
+        font,
+        fontBold,
+        pdfDoc,
+        TRANSACTION_START_Y_FIRST_PAGE,
+        data,
+        false,
+        1,
+        totalPages,
+        PAGE_BOTTOM_PADDING,
+        true
+    );
     renderStamp(firstPage, font, fontBold, data, true);
-    // Handle pagination for transactions
-    if (totalPagesNeeded === 1) {
-        // Single page - render all transactions on first page
+
+    // Add additional pages for overflow transactions
+    let currentIndex = TRANSACTIONS_PER_PAGE_FIRST;
+    let pageIndex = 1;
+    while (currentIndex < totalTransactions) {
+        const startY = pageIndex % 2 === 1 ? 764.5 : 675;
+        const transactionsPerPage = Math.floor((startY - PAGE_BOTTOM_PADDING) / 10);
+        const pageTransactions = data.transactions.slice(currentIndex, currentIndex + transactionsPerPage);
+        if (pageTransactions.length === 0) break;
+
+        // Create a new blank page
+        pdfDoc.addPage();
+        const additionalPage = pdfDoc.getPages()[pdfDoc.getPageCount() - 1];
+
+        // Render transactions on the additional page
         await renderTable(
-            firstPage,
-            data.transactions,
+            additionalPage,
+            pageTransactions,
             font,
             fontBold,
             pdfDoc,
-            TRANSACTION_START_Y_FIRST_PAGE,
+            startY,
             data,
-            true,
-            1,
-            1,
+            false,
+            pageIndex + 1,
+            totalPages,
             PAGE_BOTTOM_PADDING,
-            true
+            false
         );
-    } else {
-        // Multiple pages needed
-        // Render first page with first batch of transactions
-        const firstPageTransactions = data.transactions.slice(0, TRANSACTIONS_PER_PAGE_FIRST);
-        await renderTable(
-            firstPage,
-            firstPageTransactions,
-            font,
-            fontBold,
-            pdfDoc,
-            TRANSACTION_START_Y_FIRST_PAGE,
-            data,
-            totalPagesNeeded === 1,
-            1,
-            totalPagesNeeded,
-            PAGE_BOTTOM_PADDING,
-            true
-        );
+        renderStamp(additionalPage, font, fontBold, data, false);
 
-        // Add additional pages for overflow transactions
-        for (let pageIndex = 1; pageIndex < totalPagesNeeded; pageIndex++) {
-            const isLastPage = pageIndex === totalPagesNeeded - 1;
-            const startIndex = TRANSACTIONS_PER_PAGE_FIRST + (pageIndex - 1) * TRANSACTIONS_PER_PAGE_ADDITIONAL;
-            const endIndex = startIndex + TRANSACTIONS_PER_PAGE_ADDITIONAL;
-            const pageTransactions = data.transactions.slice(startIndex, endIndex);
-
-            // Create a new blank page
-            pdfDoc.addPage();
-            const additionalPage = pdfDoc.getPages()[pdfDoc.getPageCount() - 1];
-
-            // Render transactions on the additional page
-            await renderTable(
-                additionalPage,
-                pageTransactions,
-                font,
-                fontBold,
-                pdfDoc,
-                TRANSACTION_START_Y_ADDITIONAL_PAGES,
-                data,
-                isLastPage,
-                pageIndex + 1,
-                totalPagesNeeded,
-                PAGE_BOTTOM_PADDING,
-                false
-            );
-        }
+        currentIndex += pageTransactions.length;
+        pageIndex++;
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -496,14 +490,31 @@ function renderLastPageFooter(
     MARGIN_LEFT: number,
     MARGIN_RIGHT: number,
     borderColor: any,
-    pageNumber: number
+    pageNumber: number,
+    pageBottomPadding: number,
+    totalPages: number,
+    pdfDoc: PDFDocument,
+    isOnFooterPage: boolean = false,
+    startY: number
 ) {
     // Add closing balance footer only on the last page
     // Check if there's enough space for the footer
-    const footerHeight = 150; // Approximate height needed for footer content
-    const availableSpace = currentY - tableHeight - 220;
-
-    if (availableSpace >= footerHeight) {
+    const footerHeight = 80; // Approximate height needed for footer content
+    const adjustment = Math.max(0, startY - 675);
+    const availableSpace = height - pageBottomPadding - (currentY - tableHeight) + adjustment;
+    console.log('Last page footer check:', {
+        availableSpace,
+        footerHeight,
+        height,
+        pageBottomPadding,
+        currentY,
+        tableHeight,
+        pageNumber,
+        startY,
+        adjustment
+    });
+    if (isOnFooterPage || availableSpace >= footerHeight) {
+        console.log('Rendering last page footer on same page');
         // Enough space, render footer on this page
         const closingBalanceText = `Closing Balance`;
         const turnoverText = `Turnover for Statement Period`;
@@ -657,9 +668,32 @@ function renderLastPageFooter(
         });
     } else {
         // Not enough space, create a new page for the footer
-        console.warn(`Not enough space for footer on page ${pageNumber}, footer content would overflow`);
-        // In a real implementation, you would create a new page here and render the footer there
-        // For now, we'll render what fits and log the issue
+        console.warn(`Not enough space for footer on page ${pageNumber}, creating new page for footer`);
+        pdfDoc.addPage();
+        const footerPage = pdfDoc.getPages()[pdfDoc.getPageCount() - 1];
+        const { height: fh, width: fw } = footerPage.getSize();
+        renderFooter(footerPage, font, fontBold, data, fw, fh, pageNumber + 1, totalPages + 1, tableWidth, borderColor, MARGIN_LEFT, MARGIN_RIGHT);
+        renderLastPageFooter(
+            footerPage,
+            font,
+            fontBold,
+            data,
+            fw,
+            fh,
+            fh,
+            0,
+            tableWidth,
+            MARGIN_LEFT,
+            MARGIN_RIGHT,
+            borderColor,
+            pageNumber + 1,
+            pageBottomPadding,
+            totalPages + 1,
+            pdfDoc,
+            true,
+            fh
+        );
+        renderStamp(footerPage, font, fontBold, data, false);
     }
 }
 
@@ -686,14 +720,14 @@ const renderTable = async (
     // Add account number to top left corner for additional pages (not first page)
     if (!isFirstPage) {
         const accountNumberText = `Transactions in RAND (ZAR) : ${data?.statement_info?.account_number}`;
+
         page.drawText(accountNumberText, {
             x: MARGIN_LEFT, // Top left corner
-            y: height - 115, // Near top of page
+            y: height - (startY === 764.5 ? 25.5 : 115), // Adjusted near top of page
             size: 7.45,
             font: fontBold,
             color: COLORS.blackColor
         });
-        renderStamp(page, font, fontBold, data, false);
     }
     if (isFirstPage) {
         const accountNumberText = `XSTZFN9 : ${data?.statement_info?.account_number}`;
@@ -1006,7 +1040,8 @@ const renderTable = async (
     }
 
     renderFooter(page, font, fontBold, data, width, height, pageNumber, totalPages, tableWidth, borderColor, MARGIN_LEFT, MARGIN_RIGHT);
-    if (isLastPage) {
+    const isLastPageActual = pageNumber === totalPages;
+    if (isLastPageActual) {
         renderLastPageFooter(
             page,
             font,
@@ -1020,9 +1055,16 @@ const renderTable = async (
             MARGIN_LEFT,
             MARGIN_RIGHT,
             borderColor,
-            pageNumber
+            pageNumber,
+            pageBottomPadding,
+            totalPages,
+            pdfDoc,
+            false,
+            startY
         );
     }
+
+    renderStamp(page, font, fontBold, data, isFirstPage);
 
     // Return the new Y position after the table
     return currentY - tableHeight - 10;

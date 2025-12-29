@@ -352,6 +352,166 @@ export const fnb_sample_statement: FNBBankStatementType = {
             fees: null
         },
         {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us Ads',
+            amount: '400.00',
+            action: 'Dr',
+            balance: '2,861.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'FNB App Ric Pint To Ryan',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,861.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us T Shirt',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,461.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us Cap',
+            amount: '180.00',
+            action: 'Dr',
+            balance: '2,281.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Send Money App Dr Send Lamar Sean',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,081.60',
+            fees: '7.24'
+        },
+        {
+            date: '06 Nov',
+            description: 'Online Send Reversal Cf Send Rev 27677299995',
+            amount: '200.00',
+            action: 'Cr',
+            balance: '2,281.60',
+            fees: null
+        },
+        {
+            date: '06 Nov',
+            description: 'JErwa Manual Reversal Fee Send Rev',
+            amount: '19.00',
+            action: 'Dr',
+            balance: '2,262.60',
+            fees: null
+        },
+        {
+            date: '06 Nov',
+            description: 'POS Purchase Shopfile Devland',
+            amount: '55.73',
+            action: 'Dr',
+            balance: '2,206.87',
+            fees: '3.68'
+        },
+        {
+            date: '07 Nov',
+            description: 'Payshap Account Off-Us Food',
+            amount: '250.00',
+            action: 'Dr',
+            balance: '1,966.87',
+            fees: '3.00'
+        },
+        {
+            date: '07 Nov',
+            description: '#Debit Card POS Unsuccessful If #Fee Declined Purch Tran 4854422151000846',
+            amount: '6.00',
+            action: 'Dr',
+            balance: '1,980.87',
+            fees: null
+        },
+        {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us Ads',
+            amount: '400.00',
+            action: 'Dr',
+            balance: '2,861.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'FNB App Ric Pint To Ryan',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,861.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us T Shirt',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,461.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Payshap Account Off-Us Cap',
+            amount: '180.00',
+            action: 'Dr',
+            balance: '2,281.60',
+            fees: '3.00'
+        },
+        {
+            date: '06 Nov',
+            description: 'Send Money App Dr Send Lamar Sean',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,081.60',
+            fees: '7.24'
+        },
+        {
+            date: '06 Nov',
+            description: 'Online Send Reversal Cf Send Rev 27677299995',
+            amount: '200.00',
+            action: 'Cr',
+            balance: '2,281.60',
+            fees: null
+        },
+        {
+            date: '06 Nov',
+            description: 'JErwa Manual Reversal Fee Send Rev',
+            amount: '19.00',
+            action: 'Dr',
+            balance: '2,262.60',
+            fees: null
+        },
+        {
+            date: '06 Nov',
+            description: 'POS Purchase Shopfile Devland',
+            amount: '55.73',
+            action: 'Dr',
+            balance: '2,206.87',
+            fees: '3.68'
+        },
+        {
+            date: '07 Nov',
+            description: 'Payshap Account Off-Us Food',
+            amount: '250.00',
+            action: 'Dr',
+            balance: '1,966.87',
+            fees: '3.00'
+        },
+        {
+            date: '07 Nov',
+            description: '#Debit Card POS Unsuccessful If #Fee Declined Purch Tran 4854422151000846',
+            amount: '6.00',
+            action: 'Dr',
+            balance: '1,980.87',
+            fees: null
+        },
+        {
             date: '07 Nov',
             description: '#Debit Card POS Unsuccessful If #Fee Declined Purch Tran 4854422151000846',
             amount: '6.00',
@@ -566,6 +726,590 @@ export const fnb_sample_statement: FNBBankStatementType = {
             action: 'Dr',
             balance: '2,294.87',
             fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
+        },
+        {
+            date: '10 Nov',
+            description: 'Send Money App Dr Send Portia Portia',
+            amount: '200.00',
+            action: 'Dr',
+            balance: '2,294.87',
+            fees: '7.24'
+        },
+        {
+            date: '10 Nov',
+            description: 'FNB App Payment From Payment',
+            amount: '150.00',
+            action: 'Cr',
+            balance: '2,494.87',
+            fees: null
         }
     ],
     turnover_summary: {
