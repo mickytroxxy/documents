@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
-import { formCapitecTransactionsPrompt } from '../handlers/standard/prompts';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 import { capitec_transactions_sample, CapitecAddressType, CapitecBankStatement, Transaction } from '../handlers/capitec/sample';
 import { create } from 'domain';
 import { generateCapitecBankPDF } from '../handlers/capitec';
+import { formCapitecTransactionsPrompt } from '../handlers/capitec/prompt';
 
 const normalizeJsObjectString = (str: string): string => {
     let s = str.trim();

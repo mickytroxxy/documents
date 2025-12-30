@@ -56,6 +56,11 @@ export const handleDocumentGeneration = async ({
 }: PayslipRequestBody) => {
     const { paye, uif, net, totalDeductions } = calculatePAYE({ grossSalary: salaryAmount });
 
+    // Calculate consistent rent amount
+    const rentMin = salaryAmount * 0.15;
+    const rentMax = salaryAmount * 0.2;
+    const rentAmount = Math.floor(Math.random() * (rentMax - rentMin + 1)) + rentMin;
+
     const payslipData: any[] = [];
     const today = new Date();
     const paydayNum = parseInt(payDate);
@@ -185,7 +190,8 @@ export const handleDocumentGeneration = async ({
         physicalAddress,
         bankType: bankType as BankType,
         companyName,
-        comment
+        comment,
+        rentAmount
     });
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected
@@ -213,7 +219,8 @@ export const handleDocumentGeneration = async ({
             payslipData: isPayslipIncluded ? payslipData : [],
             availableBalance,
             bankType: bankType?.toUpperCase() as BankType,
-            openBalance
+            openBalance,
+            months
         });
         return results;
     } else {

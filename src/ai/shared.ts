@@ -18,6 +18,7 @@ export interface GenerateDocs {
     bankType?: BankType;
     companyName: string;
     comment?: string;
+    rentAmount?: number;
 }
 
 export interface FinancialDataResponse {

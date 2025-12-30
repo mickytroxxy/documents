@@ -124,16 +124,17 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
     });
 
     const account_balances_row: Array<[string, any]> = [
-        [data?.balances?.opening_balance?.amount + '' + data?.balances?.opening_balance?.action, data?.balances?.opening_balance?.action],
-        [data?.balances?.closing_balance?.amount + '' + data?.balances?.closing_balance?.action, data?.balances?.closing_balance?.action],
-        [data?.balances?.vat_inclusive?.amount + '' + data?.balances?.vat_inclusive?.action, data?.balances?.vat_inclusive?.action],
-        [data?.balances?.total_vat_zar?.amount + '' + data?.balances?.total_vat_zar?.action, data?.balances?.total_vat_zar?.action]
+        [data?.balances?.opening_balance?.amount, data?.balances?.opening_balance?.action],
+        [data?.balances?.closing_balance?.amount, data?.balances?.closing_balance?.action],
+        [data?.balances?.vat_inclusive?.amount, data?.balances?.vat_inclusive?.action],
+        [data?.balances?.total_vat_zar?.amount, data?.balances?.total_vat_zar?.action]
     ];
     account_balances_row.forEach(([label, action], idx) => {
         const y = startY - 9 * idx - 203;
-        const value_width = font.widthOfTextAtSize(label, 7.8);
-        firstPage.drawText(label, {
-            x: width - (action ? 375.4 : 385.3) - value_width,
+        const label_text = label + (label !== '0.00' ? action : '');
+        const value_width = font.widthOfTextAtSize(label_text, 7.8);
+        firstPage.drawText(label_text, {
+            x: width - (label !== '0.00' ? 375.4 : 384) - value_width,
             y,
             size: fontSize,
             font,
@@ -142,22 +143,17 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
     });
 
     const bank_charges_row: Array<[string, any]> = [
-        [data?.bank_charges?.service_fees?.amount + '' + data?.bank_charges?.service_fees?.action, data?.bank_charges?.service_fees?.action],
-        [
-            data?.bank_charges?.cash_deposit_fees?.amount + '' + data?.bank_charges?.cash_deposit_fees?.action,
-            data?.bank_charges?.cash_deposit_fees?.action
-        ],
-        [
-            data?.bank_charges?.cash_handling_fees?.amount + '' + data?.bank_charges?.cash_handling_fees?.action,
-            data?.bank_charges?.cash_handling_fees?.action
-        ],
-        [data?.bank_charges?.other_fees?.amount + '' + data?.bank_charges?.other_fees?.action, data?.bank_charges?.other_fees?.action]
+        [data?.bank_charges?.service_fees?.amount, data?.bank_charges?.service_fees?.action],
+        [data?.bank_charges?.cash_deposit_fees?.amount, data?.bank_charges?.cash_deposit_fees?.action],
+        [data?.bank_charges?.cash_handling_fees?.amount, data?.bank_charges?.cash_handling_fees?.action],
+        [data?.bank_charges?.other_fees?.amount, data?.bank_charges?.other_fees?.action]
     ];
     bank_charges_row.forEach(([label, action], idx) => {
         const y = startY - 9 * idx - 203;
-        const value_width = font.widthOfTextAtSize(label, 7.8);
-        firstPage.drawText(label, {
-            x: width - (action ? 167 : 177.5) - value_width,
+        const label_text = label + (label !== '0.00' ? action : '');
+        const value_width = font.widthOfTextAtSize(label_text, 7.8);
+        firstPage.drawText(label_text, {
+            x: width - (label !== '0.00' ? 167 : 176) - value_width,
             y,
             size: fontSize,
             font,
@@ -499,9 +495,11 @@ function renderLastPageFooter(
 ) {
     // Add closing balance footer only on the last page
     // Check if there's enough space for the footer
-    const footerHeight = 80; // Approximate height needed for footer content
-    const adjustment = Math.max(0, startY - 675);
-    const availableSpace = height - pageBottomPadding - (currentY - tableHeight) + adjustment;
+    const footerHeight = 162; // Actual height needed for footer content (from -10 to -161.5)
+    const bottomOfTable = currentY - tableHeight;
+    const footerTopY = 56.3; // Y coordinate of page number (top of page footer)
+    const gapBetweenTableAndFooter = 10; // gap used in drawing
+    const availableSpace = bottomOfTable - gapBetweenTableAndFooter - footerTopY;
     console.log('Last page footer check:', {
         availableSpace,
         footerHeight,
@@ -511,7 +509,8 @@ function renderLastPageFooter(
         tableHeight,
         pageNumber,
         startY,
-        adjustment
+        bottomOfTable,
+        footerTopY
     });
     if (isOnFooterPage || availableSpace >= footerHeight) {
         console.log('Rendering last page footer on same page');
@@ -1004,10 +1003,10 @@ const renderTable = async (
         });
 
         // Draw Amount (right-aligned)
-        const amountText = `${item?.amount}${item?.action}`;
+        const amountText = `${item?.amount}${item?.action === 'Cr' ? 'Cr' : ''}`;
         const amountTextWidth = font.widthOfTextAtSize(amountText, fontSize);
         page.drawText(amountText, {
-            x: colAmountX - amountTextWidth + (item?.action ? 17 : 10),
+            x: colAmountX - amountTextWidth + (item?.action === 'Cr' ? 17 : 10),
             y: textBaselineY,
             size: fontSize,
             font,

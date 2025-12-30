@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
-import { generateTymeBankPrompt } from '../handlers/standard/prompts';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 import { TymeBankStatement } from '../handlers/tymebank/sample';
+import { generateTymeBankPrompt } from '../handlers/tymebank/prompt';
 
 /**
  * Generate TymeBank statement data (multi-month sequence)

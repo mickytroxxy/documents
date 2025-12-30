@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { formStatementPrompt } from '../handlers/standard/prompts';
+import { formStatementPrompt } from '../handlers/standard/prompt';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 

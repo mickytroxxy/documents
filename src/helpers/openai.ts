@@ -1,6 +1,7 @@
 import { generateStandardAI } from '../ai/standard';
 import { generateTymebankAI } from '../ai/tymebank';
 import { generateCapitecAI } from '../ai/capitec';
+import { generateFnbAI } from '../ai/fnb';
 import { FinancialDataResponse, GenerateDocs, BankType } from '../ai/shared';
 
 /**
@@ -22,6 +23,8 @@ export const generateStatementData = async (data: GenerateDocs): Promise<Financi
             return await generateTymebankAI(data);
         } else if (bankType === 'CAPITEC') {
             return await generateCapitecAI(data);
+        } else if (bankType === 'FNB') {
+            return await generateFnbAI(data);
         } else {
             return await generateStandardAI(data);
         }
