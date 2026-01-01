@@ -79,7 +79,8 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
         salaryAmount,
         physicalAddress,
         companyName,
-        comment
+        comment,
+        accountType
     } = data;
 
     if (!physicalAddress) {
@@ -157,7 +158,8 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
             physicalAddress,
             companyName,
             isLastMonth: i === months - 1,
-            comment
+            comment,
+            accountType
         };
 
         const monthlyUserMessage = formFnbStatementPrompt(monthlyPromptData);
@@ -194,22 +196,14 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
                     let effectiveFees = fees;
 
                     if (tx.action === 'Dr') {
-                        const totalDeduct = effectiveAmount + effectiveFees;
-                        if (recalculatedBalance - totalDeduct < 0) {
+                        if (recalculatedBalance - effectiveAmount < 0) {
                             // Adjust to prevent negative balance
-                            const maxDeduct = recalculatedBalance;
-                            if (effectiveFees >= maxDeduct) {
-                                // Can't deduct fees, skip or adjust fees? For now, set amount to 0
-                                effectiveAmount = 0;
-                                effectiveFees = 0;
-                            } else {
-                                effectiveAmount = maxDeduct - effectiveFees;
-                            }
+                            effectiveAmount = recalculatedBalance;
                             // Update tx.amount to reflect adjustment
                             tx.amount = tx.amount.startsWith('-') ? `-${effectiveAmount.toFixed(2)}` : `-${effectiveAmount.toFixed(2)}`;
                         }
                         recalculatedBalance -= effectiveAmount;
-                        recalculatedBalance -= effectiveFees;
+                        // Fees are not subtracted from balance - they are accrued
                     } else if (tx.action === 'Cr') {
                         recalculatedBalance += effectiveAmount;
                     }
@@ -248,7 +242,14 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
                 }
             }
 
-            const content = createFnbStatementData(transactions, accountHolder, accountNumber, address, statementPeriod);
+            const content = createFnbStatementData(
+                transactions,
+                accountHolder,
+                accountNumber,
+                address,
+                statementPeriod,
+                accountType || 'Easy Account'
+            );
             statements.push(content);
             currentBalance = parseFloat(content.balances.closing_balance.amount);
         } catch (monthlyError) {
@@ -280,70 +281,117 @@ export const createFnbStatementData = (
     accountHolder: string,
     accountNumber: string,
     address: any,
-    statementPeriod: { from: string; to: string }
+    statementPeriod: { from: string; to: string },
+    accountType: string
 ): FNBBankStatementType => {
-    // Calculate opening balance from first transaction
+    const VAT_RATE = 0.15;
+
+    const toNumber = (v?: string | null) => (v ? parseFloat(v) || 0 : 0);
+
+    // ---------- Opening / Closing ----------
     const openingBalanceAmount =
         transactions.length > 0
-            ? parseFloat(transactions[0].balance) - parseFloat(transactions[0].amount) + (transactions[0].fees ? parseFloat(transactions[0].fees) : 0)
+            ? toNumber(transactions[0].balance) - toNumber(transactions[0].amount) + (transactions[0].fees ? toNumber(transactions[0].fees) : 0)
             : 0;
 
-    const closingBalanceAmount = transactions.length > 0 ? parseFloat(transactions[transactions.length - 1].balance) : 0;
+    const closingBalanceAmount = transactions.length > 0 ? toNumber(transactions[transactions.length - 1].balance) : 0;
 
-    // Calculate totals
+    // ---------- Credits / Debits ----------
     const creditTransactions = transactions.filter((t) => t.action === 'Cr');
     const debitTransactions = transactions.filter((t) => t.action === 'Dr');
 
-    const creditTotal = creditTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const debitTotal = debitTransactions.reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+    const creditTotal = creditTransactions.reduce((s, t) => s + toNumber(t.amount), 0);
 
-    // Bank charges
+    const debitTotal = debitTransactions.reduce((s, t) => s + Math.abs(toNumber(t.amount)), 0);
+
+    // ---------- BANK CHARGE CLASSIFICATION ----------
+
     const serviceFees = transactions
-        .filter((t) => t.description?.toLowerCase().includes('fee') && t.action === 'Dr')
-        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+        .filter((t) => t.action === 'Dr' && /service fees|monthly fee|bank fee|account fee/i.test(t.description || ''))
+        .reduce((s, t) => s + Math.abs(toNumber(t.amount)), 0);
 
+    // Cash Deposit Fees
     const cashDepositFees = transactions
-        .filter((t) => t.description?.toLowerCase().includes('cash deposit') && t.fees)
-        .reduce((sum, t) => sum + parseFloat(t.fees!), 0);
+        .filter((t) => t.action === 'Dr' && /cash deposit fee|cash deposit charges?/i.test(t.description || ''))
+        .reduce((s, t) => s + (t.fees ? toNumber(t.fees) : Math.abs(toNumber(t.amount))), 0);
 
-    // For simplicity, set other fees to 0 or calculate if needed
-    const cashHandlingFees = 0;
-    const otherFees = 0;
+    // Cash Handling Fees
+    const cashHandlingFees = transactions
+        .filter((t) => t.action === 'Dr' && /cash handling/i.test(t.description || ''))
+        .reduce((s, t) => s + Math.abs(toNumber(t.amount)), 0);
 
-    // Use the provided address
+    // Debit interest (separate, not included in other fees)
+    const debitInterestCharges = transactions
+        .filter((t) => t.action === 'Dr' && /int on debit balance|debit interest|interest on overdraft/i.test(t.description || ''))
+        .reduce((s, t) => s + Math.abs(toNumber(t.amount)), 0);
+
+    // STRICT other fees: bank-created costs ONLY
+    const otherFees = transactions
+        .filter((t) => {
+            if (t.action !== 'Dr') return false;
+
+            const d = (t.description || '').toLowerCase();
+
+            // exclude normal spend/payment activity
+            if (
+                /pos|purchase|atm|withdrawal|withdraw|cashsend|send money|eft|transfer|payment|debit order|fuel|kfc|shoprite|spar|pick n pay|bolt|uber/i.test(
+                    d
+                )
+            )
+                return false;
+
+            // exclude already-counted categories
+            if (/charge|commission|declined|Unsuccessful|penalty|reversal|overdraft|withdrawal fee/i.test(d)) {
+                // ok: still a bank fee but not yet classified above
+                return true;
+            }
+
+            // otherwise do NOT count
+            return false;
+        })
+        .reduce((s, t) => s + Math.abs(toNumber(t.amount)), 0);
+
+    // ---------- VAT COMPUTATION ----------
+
+    const vatInclusiveTotal = serviceFees + cashDepositFees + cashHandlingFees + otherFees + debitInterestCharges;
+
+    // Extract 15% VAT portion from VAT-inclusive amount
+    const vatPortion = vatInclusiveTotal * (VAT_RATE / (1 + VAT_RATE));
+
+    // ---------- ADDRESS ----------
     const customerAddress = address || {};
 
+    // ---------- DATE HANDLING ----------
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     const parseDate = (dateStr: string) => {
-        const parts = dateStr.split(' ');
-        const day = parseInt(parts[0]);
-        const month = monthNames.indexOf(parts[1]);
-        const year = parseInt(parts[2]);
-        return new Date(year, month, day);
+        const [dayStr, monStr, yearStr] = dateStr.split(' ');
+        return new Date(parseInt(yearStr), monthNames.indexOf(monStr), parseInt(dayStr));
     };
 
     const fromDate = parseDate(statementPeriod.from);
     const toDate = parseDate(statementPeriod.to);
     const currentDate = toDate;
 
-    const statementPeriodStr = `${fromDate.getDate().toString().padStart(2, '0')} ${fromDate.toLocaleString('default', {
-        month: 'long'
-    })} ${fromDate.getFullYear()} to ${toDate.getDate().toString().padStart(2, '0')} ${toDate.toLocaleString('default', {
-        month: 'long'
-    })} ${toDate.getFullYear()}`;
+    const statementPeriodStr =
+        `${fromDate.getDate().toString().padStart(2, '0')} ` +
+        `${fromDate.toLocaleString('default', { month: 'long' })} ` +
+        `${fromDate.getFullYear()} to ` +
+        `${toDate.getDate().toString().padStart(2, '0')} ` +
+        `${toDate.toLocaleString('default', { month: 'long' })} ` +
+        `${toDate.getFullYear()}`;
 
     return {
         statement_info: {
             reference_number: `SMT${Math.random().toString().slice(2, 15)}`,
             issue_date: formatDate(currentDate, 'long'),
             statement_period: statementPeriodStr,
-            statement_date: formatDate(new Date(), 'long'),
+            statement_date: formatDate(Date.now(), 'long'),
             customer_name: accountHolder,
             customer_id: Math.random().toString().slice(2, 8),
             customer_address: customerAddress,
             account_number: accountNumber,
-            account_type: 'Business Account',
+            account_type: accountType || 'Easy Account',
             tax_invoice_statement_number: '1',
             branch_code: '260665',
             branch_address: 'P O Box 5711, Weiteweden Park, 1709',
@@ -358,22 +406,37 @@ export const createFnbStatementData = (
             }
         },
         balances: {
-            opening_balance: { amount: openingBalanceAmount.toFixed(2), action: openingBalanceAmount >= 0 ? 'Cr' : 'Dr' },
-            closing_balance: { amount: closingBalanceAmount.toFixed(2), action: closingBalanceAmount >= 0 ? 'Cr' : 'Dr' },
-            vat_inclusive: { amount: '0.00', action: null },
-            total_vat_zar: { amount: '0.00', action: null }
+            opening_balance: {
+                amount: openingBalanceAmount.toFixed(2),
+                action: openingBalanceAmount >= 0 ? 'Cr' : 'Dr'
+            },
+            closing_balance: {
+                amount: closingBalanceAmount.toFixed(2),
+                action: closingBalanceAmount >= 0 ? 'Cr' : 'Dr'
+            },
+            vat_inclusive: {
+                amount: vatInclusiveTotal.toFixed(2),
+                action: 'Dr'
+            },
+            total_vat_zar: {
+                amount: vatPortion.toFixed(2),
+                action: 'Dr'
+            }
         },
         bank_charges: {
             service_fees: { amount: serviceFees.toFixed(2), action: 'Dr' },
             cash_deposit_fees: { amount: cashDepositFees.toFixed(2), action: 'Dr' },
             cash_handling_fees: { amount: cashHandlingFees.toFixed(2), action: 'Dr' },
-            other_fees: { amount: otherFees.toFixed(2), action: 'Dr' }
+            other_fees: {
+                amount: (otherFees + debitInterestCharges).toFixed(2),
+                action: 'Dr'
+            }
         },
         interest_rates: {
             credit_rate: 'Tiered',
-            debit_rate: '24.00%'
+            debit_rate: '24.00%' // rate label — monetary charge captured in other_fees
         },
-        transactions: transactions,
+        transactions,
         turnover_summary: {
             credit_transactions: {
                 count: creditTransactions.length,

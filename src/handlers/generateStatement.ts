@@ -371,7 +371,7 @@ async function generateFnbStatements({
     accountFolder: string;
 }): Promise<{ statementFiles: string[]; statementPath?: string }> {
     mkdirp.sync(accountFolder);
-
+    const statementNumber = Math.floor(1 + Math.random() * 9);
     if (statements.length > 0) {
         const statementFiles: string[] = [];
         for (let i = 0; i < statements.length; i++) {
@@ -399,7 +399,8 @@ async function generateFnbStatements({
             const outputPath = path.resolve(`${accountFolder}/${fileName}`);
             try {
                 console.log(`Generating FNB PDF for statement ${i + 1} at ${outputPath}`);
-                await generateFNBBankPDF(statementData, 8, outputPath);
+
+                await generateFNBBankPDF(statementData, statementNumber + i, outputPath);
                 console.log(`Successfully generated PDF at ${outputPath}`);
             } catch (error) {
                 console.error(`Failed to generate PDF for statement ${i + 1}:`, error);

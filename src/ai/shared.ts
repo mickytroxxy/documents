@@ -20,6 +20,7 @@ export interface GenerateDocs {
     companyName: string;
     comment?: string;
     rentAmount?: number;
+    accountType?: string;
 }
 
 export interface FinancialDataResponse {

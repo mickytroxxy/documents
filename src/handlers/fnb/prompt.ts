@@ -3,7 +3,6 @@ import { FormStatementPrompt } from '../standard/prompt';
 export const formFnbStatementPrompt = ({
     accountHolder,
     accountNumber,
-    months,
     openBalance,
     availableBalance,
     payDate,
@@ -15,7 +14,8 @@ export const formFnbStatementPrompt = ({
     statementPeriod,
     currentMonth,
     totalMonths,
-    openingBalance: currentOpeningBalance
+    openingBalance: currentOpeningBalance,
+    accountType
 }: Omit<FormStatementPrompt, 'availableBalance'> & {
     availableBalance?: number;
     comment?: string;
@@ -23,6 +23,7 @@ export const formFnbStatementPrompt = ({
     currentMonth?: number;
     totalMonths?: number;
     openingBalance?: number;
+    accountType?: string;
 }) => {
     const calculatedRent =
         rentAmount ||
@@ -32,8 +33,20 @@ export const formFnbStatementPrompt = ({
             return Math.floor(Math.random() * (rentMax - rentMin + 1)) + rentMin;
         })();
 
+    const accountTypeFees: Record<string, number> = {
+        'FNB Easy Zero': 0,
+        'FNB Easy PAYU': 7.5,
+        'FNB Easy Bundle/Smart': 67.25,
+        'FNB Aspire': 120,
+        'FNB Premier': 250,
+        'FNB Private Clients': 455,
+        'Business Account': 569.66
+    };
+
+    const monthlyFee = accountTypeFees[accountType || 'Business Account'] || 569.66;
+
     // Calculate transaction count for this specific period (30 days)
-    const transactionCount = 40;
+    const transactionCount = 42;
 
     const currentDate = new Date();
 
@@ -78,9 +91,184 @@ ACCOUNT INFORMATION
 ================================================================
 Account Holder: ${accountHolder}
 Account Number: ${accountNumber}
+Account Type: ${accountType || 'Business Account'}
 Company: ${companyName}
 Pay Date: ${payDate}th of each month
 
+
+================================================================
+DATA VALIDATION — NON-NEGOTIABLE (MUST FOLLOW EXACTLY)
+================================================================
+
+ZERO-VALUE TRANSACTIONS ARE NOT ALLOWED.
+
+The following transaction types MUST ALWAYS have a real non-zero
+monetary amount and MUST affect the balance:
+
+• POS Purchases
+• Airtime Purchases
+• Debit Orders
+• Send Money
+• ATM Withdrawals
+• Payshap Payments
+• FNB App Payments
+• Transfers
+• Cash Deposits
+• Cash Send
+
+STRICT RULES:
+
+1) NO Dr transaction may have amount "0.00"
+2) NO placeholder / synthetic / empty value transactions
+3) NO transaction may exist without a real monetary amount
+4) NO fee value may replace a transaction amount
+5) Every Dr transaction must reduce the balance
+6) Every Cr transaction must increase the balance
+
+Any transaction missing a valid numeric amount MUST NOT be generated.
+
+================================================================
+AMOUNT & FEE INTEGRITY (MUST FOLLOW EXACTLY)
+================================================================
+
+• "amount" represents the REAL transaction value
+• "fees" represents the BANK CHARGE only
+• fees MUST NOT be used as the debit amount
+• Do NOT generate transactions where:
+  - amount = "0.00"
+  - amount is blank
+  - amount is undefined
+  - amount is replaced by fee
+
+POS / Airtime / Debit Orders MUST NEVER appear as:
+• 0.00 Dr
+• 0.00 with a fee value only
+• debit rows without financial substance
+
+These must ALWAYS include a real debit amount.
+
+================================================================
+BALANCE CAUSALITY RULE (CRITICAL)
+================================================================
+
+Every transaction MUST logically change the balance:
+
+For Cr:
+• balance_after = balance_before + amount
+
+For Dr:
+• balance_after = balance_before - abs(amount) - fees
+
+A Dr transaction that does not reduce the balance is INVALID.
+
+The generator must not create transactions that:
+• do not affect balance
+• reverse themselves
+• produce arithmetic inconsistencies
+• cause negative balances
+• exceed available balance
+
+================================================================
+REALISM ENFORCEMENT
+================================================================
+
+FNB statements MUST reflect real financial behaviour:
+
+• You CANNOT buy R0 airtime
+• You CANNOT perform a R0 POS purchase
+• You CANNOT run a R0 debit order
+• You CANNOT withdraw R0 cash
+• You CANNOT send R0 money
+
+If a transaction would result in a zero amount,
+DO NOT GENERATE IT — instead generate a realistic event.
+================================================================
+ACCRUED BANK CHARGES — STRICT ACCOUNTING RULES
+================================================================
+
+"Accrued Bank Charges" is an informational running total ONLY.
+
+It MUST NOT be treated as a debit transaction.
+
+RULES:
+
+1) Accrued Bank Charges MUST NEVER include:
+   • "Dr"
+   • "Cr"
+   • brackets
+   • polarity notation
+
+2) Accrued Bank Charges MUST NOT:
+   • reduce the balance per transaction
+   • post as a debit line item
+   • cause overdraft
+   • double-charge during month-end fees
+
+3) All accrued charges are ONLY deducted ONCE at month-end as:
+   • "#Service Fees"
+   • "#Monthly Account Fee"
+
+4) Per-transaction fees behave as follows:
+
+   • "fees" column = bank charge for that event
+   • NOT deducted immediately
+   • added to accrued total ONLY
+
+5) Month-end service fee MUST equal:
+   SUM(all fees in the month)
+
+6) The running account balance MUST be calculated WITHOUT fees.
+
+================================================================
+BALANCE POLARITY & OVERDRAFT RESTRICTIONS
+================================================================
+
+• Balance MUST remain positive (Cr) at all times
+• NO overdraft unless explicitly requested
+• The "Dr" suffix MUST NEVER appear on the balance
+• Dr balance states are INVALID for this generator
+
+For Dr transactions:
+• Reduce balance by ABS(amount) ONLY
+• DO NOT subtract fees from balance
+• fees are accrued, not deducted  -> DO NOT SUBTRACT FROM BALANCE. IF BALANCE IS R1000, AMOUNT IS R500, NEW BALANCE IS R500.00 NOT R497.00
+
+================================================================
+REALISM VALIDATION — VALUE RANGES
+================================================================
+
+Vendor-specific transactions MUST fall inside realistic bands:
+
+Debit Order: CarTrack
+• Allowed range: R100.00 – R159.00 ONLY
+
+Debit Order: Insurance
+• R250.00 – R450.00
+
+Funeral Cover
+• R150.00 – R250.00
+
+Gym
+• R299.00 – R399.00
+
+Reject and DO NOT generate:
+• unrealistic micro-debits
+• synthetic amounts such as 10.28, 12.34, 1.99
+• artificial values not seen on real FNB statements
+
+================================================================
+STRICT ENFORCEMENT
+================================================================
+
+If ANY of the following occur, REGENERATE the transaction:
+
+• Accrued charges marked as "Dr" or "Cr"
+• Fees deducted from balance
+• Balance flips to Dr
+• Balance goes negative
+• Debit order values outside realistic ranges
+• Per-transaction fees replace debit values
+• Accrued fees double-charged
 ================================================================
 DATE RULES (CRITICAL)
 ================================================================
@@ -202,8 +390,23 @@ REQUIRED TRANSACTION TYPES FOR THIS MONTH (${transactionCount} TOTAL)
    • Description: "Send Money App Dr Send Lamar Sean" or "Send Money App Dr Send Portia Portia"
    • action: 'Dr'
 
-8. OTHER MANDATORY (THIS MONTH)
-   • Monthly Account Admin Fee: 569.66 (last day)
+8. MONTH-END SERVICE FEES (1)
+    • Date: Last day of the month
+    • Amount: Sum of all fees from other transactions in this month
+    • Description: "#Service Fees"
+    • action: 'Dr'
+    • amount: sum of fees from other transactions
+    • fees: null
+
+9. MONTHLY ACCOUNT FEE (1)
+    • Date: Last day of the month
+    • Amount: ${monthlyFee.toFixed(2)} (for ${accountType || 'Business Account'})
+    • Description: "#Monthly Account Fee"
+    • action: 'Dr'
+    • amount: "-${monthlyFee.toFixed(2)}"
+    • fees: null
+
+10. OTHER MANDATORY (THIS MONTH)
    • Interest Received: occasional small credits like "Interest Received"
    • Cash Deposit Fees: 9.08
    • POS Purchases: "POS Purchase Shopfile Devland"
@@ -228,6 +431,7 @@ CRITICAL FORMATTING:
 • In sample: amount: '1,800.00' for Cr, '-120.00' for Dr
 • balance MUST be string with 2 decimals
 • fees MUST be string with 2 decimals or null
+• CRITICAL: Fees are accrued only and NEVER subtracted from balance for individual transactions
 • NO adjustment descriptions like "ADJUSTMENT", "FINAL", "BALANCE"
 • Use ONLY realistic FNB descriptions
 
@@ -236,18 +440,19 @@ BALANCE CALCULATION RULES
 ================================================================
 • Starting balance: ${currentOpeningBalance ? currentOpeningBalance.toFixed(2) : openBalance.toFixed(2)}
 • For Cr: balance = previous + amount
-• For Dr: balance = previous - abs(amount) - fees (if any)
+• For Dr: balance = previous - abs(amount)
 • CRITICAL: NO Dr transaction can exceed the current balance. Balance CANNOT go negative.
-• Fees are deducted from balance for Dr transactions.
+• Fees are NOT deducted from balance for individual transactions - they are accrued and deducted only at month-end.
 ${availableBalance ? `• Final balance MUST exactly be: ${availableBalance.toFixed(2)}` : '• Balance should progress naturally'}
-• Calculate balances sequentially: each transaction's balance must be previous balance + amount (for Cr) or previous balance - abs(amount) - fees (for Dr)
+• Calculate balances sequentially: each transaction's balance must be previous balance + amount (for Cr) or previous balance - abs(amount) (for Dr)
 • Ensure progressive balancing: the balance must gradually reach the final availableBalance without sudden jumps or negative values
 • For multi-month statements, ensure the balance progresses naturally from month to month, with the closing balance of one month effectively becoming the opening for the next.
 
 ================================================================
 CRITICAL FEE HANDLING
 ================================================================
-• Fees are separate from balance calculation and must not affect the balance.
+• Fees are separate from balance calculation and must NOT affect the balance for individual transactions.
+• Fees are accrued and only deducted at month-end via the service fee transaction.
 • For transactions that have fees (as specified in the rules), set the "fees" field to the exact amount (e.g., "3.00").
 • For transactions without fees, set "fees" to null.
 • Do not set fees to "0.00" unless the fee is actually 0.
@@ -270,7 +475,7 @@ Use realistic decimal endings:
 ================================================================
 OUTPUT REQUIREMENTS
 ================================================================
-• EXACTLY ${transactionCount} transactions
+• EXACTLY ${transactionCount} transactions (including mandatory month-end fees)
 • NO future dates
 • Multiple transactions per day (some days 2-5 transactions)
 • Dates may repeat
@@ -300,7 +505,7 @@ AND YOUR RESPONSE MUST BE LIKE:
       "description": "Payshap Account Off-Us Landlord",
       "amount": "-${calculatedRent.toFixed(2)}",
       "action": "Dr",
-      "balance": "${(currentOpeningBalance ? currentOpeningBalance - calculatedRent - 3 : openBalance - calculatedRent - 3).toFixed(2)}",
+      "balance": "${(currentOpeningBalance ? currentOpeningBalance - calculatedRent : openBalance - calculatedRent).toFixed(2)}",
       "fees": "3.00"
     },
     {
@@ -309,8 +514,8 @@ AND YOUR RESPONSE MUST BE LIKE:
       "amount": "${salaryAmount.toFixed(2)}",
       "action": "Cr",
       "balance": "${(currentOpeningBalance
-          ? currentOpeningBalance - calculatedRent - 3 + salaryAmount
-          : openBalance - calculatedRent - 3 + salaryAmount
+          ? currentOpeningBalance - calculatedRent + salaryAmount
+          : openBalance - calculatedRent + salaryAmount
       ).toFixed(2)}",
       "fees": null
     }
@@ -324,6 +529,7 @@ AND YOUR RESPONSE MUST BE LIKE:
 }
 
 Calculate balances correctly through all ${transactionCount} transactions, ensuring no balance goes negative.
+Include the month-end service fees as the sum of all fees in the month, and the monthly account fee.
 Use ONLY realistic FNB transaction descriptions.
 ${availableBalance ? `\nCRITICAL: The final balance MUST exactly match the required available balance of R${availableBalance.toFixed(2)}` : ''}
 `;

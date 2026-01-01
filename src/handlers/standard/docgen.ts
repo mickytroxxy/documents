@@ -29,6 +29,7 @@ type PayslipRequestBody = {
     physicalAddress: string;
     isPayslipIncluded: string;
     comment?: string;
+    accountType?: string;
 };
 export const handleDocumentGeneration = async ({
     accountHolder,
@@ -53,7 +54,8 @@ export const handleDocumentGeneration = async ({
     bankType,
     physicalAddress,
     isPayslipIncluded,
-    comment
+    comment,
+    accountType
 }: PayslipRequestBody) => {
     const { paye, uif, net, totalDeductions } = calculatePAYE({ grossSalary: salaryAmount });
 
@@ -192,7 +194,8 @@ export const handleDocumentGeneration = async ({
         bankType: bankType as BankType,
         companyName,
         comment,
-        rentAmount
+        rentAmount,
+        accountType
     });
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected

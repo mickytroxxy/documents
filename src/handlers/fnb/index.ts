@@ -103,7 +103,7 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
         size: 7.8,
         color: COLORS.blackColor
     });
-    const stmt_period_text = `${data?.statement_info?.statement_period}`;
+    const stmt_period_text = `Statement Period : ${data?.statement_info?.statement_period}`;
     const stmt_period_width = font.widthOfTextAtSize(stmt_period_text, 7.8);
     firstPage.drawText(stmt_period_text, {
         x: width - 13 - stmt_period_width,
@@ -113,7 +113,7 @@ export async function generateFNBBankPDF(data: FNBBankStatementType, stmt_number
         color: COLORS.blackColor
     });
 
-    const stmt_date_text = formatDate(data?.statement_info?.statement_date, 'long');
+    const stmt_date_text = `Statement Date : ${data?.statement_info?.statement_date}`;
     const stmt_date_width = fontBold.widthOfTextAtSize(stmt_date_text, 7.8);
     firstPage.drawText(stmt_date_text, {
         x: width - 13.2 - stmt_date_width,
