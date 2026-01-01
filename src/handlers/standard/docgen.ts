@@ -3,6 +3,7 @@ import { BankType, generateStatementData } from '../../helpers/openai';
 import { generateBankStatement } from '../generateStatement';
 import { StatementData } from './types';
 import { TymeBankStatement } from '../tymebank/sample';
+import { FNBBankStatementType } from '../fnb/sample';
 
 type PayslipRequestBody = {
     accountHolder: string;
@@ -196,23 +197,17 @@ export const handleDocumentGeneration = async ({
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected
         // Handle the case where we have a mixed array of StatementData | TymeBankStatement | CapitecBankStatement
-        let statementDetails: StatementData | { statements: any[]; rawData: any } | TymeBankStatement[] | any;
+        let statementDetails: { statements: any[]; rawData: any };
 
-        // Check if this is TymeBank data (array of statements) or Standard Bank data (single statement)
-        if (bankType === 'TYMEBANK') {
-            // For TymeBank, we need to create a raw data structure that generateBankStatement can handle
-            statementDetails = {
-                statements: financialData.data.statements,
-                rawData: {
-                    bankType: 'TYMEBANK',
-                    accountHolder: accountHolderWithTitle,
-                    accountNumber: accountNumber
-                }
-            };
-        } else {
-            // For standard banks and Capitec, use the first statement directly
-            statementDetails = financialData.data.statements[0];
-        }
+        // Always wrap in the object structure for consistency
+        statementDetails = {
+            statements: financialData.data.statements,
+            rawData: {
+                bankType: bankType?.toUpperCase() as BankType,
+                accountHolder: accountHolderWithTitle,
+                accountNumber: accountNumber
+            }
+        };
 
         const results = await generateBankStatement({
             statementDetails,

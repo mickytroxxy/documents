@@ -11,6 +11,7 @@ import { generateTymeBankPDF } from './tymebank';
 import { TymeBankStatement } from './tymebank/sample';
 import { generateCapitecBankPDF } from './capitec';
 import { generateFNBBankPDF } from './fnb';
+import { FNBBankStatementType } from './fnb/sample';
 
 // Helper: rebalance TymeBank statements to enforce opening balance and continuity
 function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: number): TymeBankStatement[] {
@@ -363,170 +364,99 @@ async function processCapitecBank({
  * Generate FNB statements (single or multi-month).
  */
 async function generateFnbStatements({
-    statement,
-    accountFolder,
-    months,
-    openBalance,
-    availableBalance
+    statements,
+    accountFolder
 }: {
-    statement: any;
+    statements: FNBBankStatementType[];
     accountFolder: string;
-    months: number;
-    openBalance?: number;
-    availableBalance?: number;
 }): Promise<{ statementFiles: string[]; statementPath?: string }> {
     mkdirp.sync(accountFolder);
 
-    if (months > 1) {
-        const today = new Date();
+    if (statements.length > 0) {
         const statementFiles: string[] = [];
+        for (let i = 0; i < statements.length; i++) {
+            const statementData = statements[i];
 
-        // Split transactions by month
-        const monthlyTransactions: any[][] = [];
-        for (let i = 0; i < months; i++) {
-            monthlyTransactions.push([]);
-        }
-
-        const earliestMonth = today.getMonth() - (months - 1);
-        const normalizedEarliestMonth = ((earliestMonth % 12) + 12) % 12;
-
-        statement.transactions.forEach((tx: any) => {
-            // Parse date "DD MMM" to determine month
-            const dateParts = tx.date.split(' ');
-            const monthName = dateParts[1];
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const monthIndex = monthNames.indexOf(monthName);
-            if (monthIndex !== -1) {
-                // Calculate offset from earliest month
-                let monthOffset = monthIndex - normalizedEarliestMonth;
-                if (monthOffset < 0) monthOffset += 12;
-                if (monthOffset < months) {
-                    monthlyTransactions[monthOffset].push(tx);
+            // Parse the statement period to create the filename
+            const parsePeriodDate = (dateStr: string) => {
+                const parts = dateStr.split(' ');
+                if (parts.length < 3) {
+                    // Handle partial date strings (like "01" from "01 November")
+                    const day = parts[0].padStart(2, '0');
+                    return `${day}_JAN`; // Default month if parsing fails
                 }
-            }
-        });
-
-        const increment = availableBalance !== undefined && openBalance !== undefined ? (availableBalance - openBalance) / months : 0;
-
-        for (let i = 0; i < months; i++) {
-            const monthTransactions = monthlyTransactions[i];
-            if (monthTransactions.length === 0) continue;
-
-            const monthDate = new Date(today);
-            monthDate.setMonth(today.getMonth() - (months - 1 - i));
-
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const monthName = monthNames[monthDate.getMonth()];
-            const year = monthDate.getFullYear();
-
-            // Create monthly statement
-            const startDate = new Date(year, monthDate.getMonth(), 1);
-            const endDate = new Date(year, monthDate.getMonth() + 1, 0);
-            const monthlyStatement = {
-                ...statement,
-                transactions: monthTransactions,
-                statement_info: {
-                    ...statement.statement_info,
-                    statement_period: `${startDate.getDate()} ${monthName} ${year} to ${endDate.getDate()} ${monthName} ${year}`,
-                    statement_date: `${endDate.getDate()} ${monthName} ${year}`
-                },
-                balances: {
-                    ...statement.balances,
-                    opening_balance: { amount: ((openBalance || 0) + increment * i).toFixed(2), action: 'Cr' },
-                    closing_balance: { amount: ((openBalance || 0) + increment * (i + 1)).toFixed(2), action: 'Cr' }
-                }
+                const day = parts[0].padStart(2, '0');
+                const month = parts[1].toUpperCase().substring(0, 3); // Use 3-letter month abbreviation
+                return `${day}_${month}`;
             };
 
-            const monthFileName = `bankstatement_${monthName}_${year}.pdf`;
-            const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
+            const periodParts = statementData.statement_info.statement_period.split(' to ');
+            const periodFrom = parsePeriodDate(periodParts[0]);
+            const periodTo = parsePeriodDate(periodParts[1]);
+            const year = periodParts[1].split(' ').pop();
 
-            console.log(`Generating FNB PDF for ${monthName} ${year} at ${monthOutputPath}`);
-            await generateFNBBankPDF(monthlyStatement, 8, monthOutputPath);
-            console.log(`Successfully generated PDF at ${monthOutputPath}`);
+            const fileName = `fnb_statement_${periodFrom}_${periodTo}_${year}.pdf`;
+            const outputPath = path.resolve(`${accountFolder}/${fileName}`);
+            try {
+                console.log(`Generating FNB PDF for statement ${i + 1} at ${outputPath}`);
+                await generateFNBBankPDF(statementData, 8, outputPath);
+                console.log(`Successfully generated PDF at ${outputPath}`);
+            } catch (error) {
+                console.error(`Failed to generate PDF for statement ${i + 1}:`, error);
+                continue;
+            }
 
-            if (fs.existsSync(monthOutputPath)) {
-                statementFiles.push(monthFileName);
+            if (fs.existsSync(outputPath)) {
+                console.log(`File exists: ${outputPath}, size: ${fs.statSync(outputPath).size} bytes`);
+                statementFiles.push(fileName);
+            } else {
+                console.error(`File was not created: ${outputPath}`);
             }
         }
         return { statementFiles };
+    } else {
+        return { statementFiles: [] };
     }
-
-    // Single statement path
-    const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
-    const statementPath = await generateFNBBankPDF(statement, 8, outputFilePath);
-    return { statementFiles: [], statementPath };
 }
 
 /**
- * FNB flow: statement -> PDF -> payslips.
+ * FNB flow: statements -> PDFs -> payslips.
  */
 async function processFnbBank({
     statementDetails,
-    payslipData,
-    openBalance,
-    availableBalance,
-    months
+    payslipData
 }: {
-    statementDetails: any | { statements: any[]; rawData: any };
+    statementDetails: FNBBankStatementType[] | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
-    openBalance?: number;
-    availableBalance?: number;
-    months?: number;
 }) {
-    let statement: any;
+    let statements: FNBBankStatementType[];
     let accountNumber = '';
+    let accountHolder: string | undefined;
+    let rawAccountNumber: string | undefined;
 
     if ('statements' in statementDetails && 'rawData' in statementDetails) {
         const raw = statementDetails as { statements: any[]; rawData: any };
-        [statement] = raw.statements;
-        accountNumber = raw.rawData?.accountNumber?.replace(/\s+/g, '') || '';
+        statements = raw.statements as FNBBankStatementType[];
+        const { accountNumber: rawAcc, accountHolder: holder } = raw.rawData;
+        rawAccountNumber = rawAcc;
+        accountHolder = holder;
+        accountNumber = rawAcc?.replace(/\s+/g, '') || '';
+        console.log('Statement details received:', statementDetails);
+        console.log('Extracted account number:', accountNumber);
     } else {
-        statement = statementDetails;
-        accountNumber = statement?.statement_info?.account_number?.replace(/\s+/g, '') || '';
+        statements = statementDetails as FNBBankStatementType[];
+        accountNumber = statements[0]?.statement_info?.account_number?.replace(/\s+/g, '') || '';
+        console.log('Statement details received:', statementDetails);
+        console.log('Extracted account number:', accountNumber);
     }
-
     if (!accountNumber) throw new Error('Missing account number for FNB');
-
-    // Override balances with provided values
-    if (openBalance !== undefined) {
-        statement.balances = statement.balances || {};
-        statement.balances.opening_balance = { amount: openBalance.toFixed(2), action: openBalance >= 0 ? 'Cr' : 'Dr' };
-    }
-    if (availableBalance !== undefined) {
-        statement.balances = statement.balances || {};
-        statement.balances.closing_balance = { amount: availableBalance.toFixed(2), action: availableBalance >= 0 ? 'Cr' : 'Dr' };
-    }
-
-    // Recalculate transaction balances to match the provided balances
-    if (statement.transactions && Array.isArray(statement.transactions)) {
-        let currentBalance = openBalance !== undefined ? openBalance : parseFloat(statement.balances?.opening_balance?.amount || '0');
-        statement.transactions.forEach((tx: any) => {
-            // For FNB, amount is string with sign, action indicates Cr/Dr
-            // IMPORTANT: Do not subtract fees from balance, fees are separate
-            const amount = parseFloat(tx.amount);
-            if (tx.action === 'Dr') {
-                currentBalance -= Math.abs(amount);
-            } else if (tx.action === 'Cr') {
-                currentBalance += Math.abs(amount);
-            }
-            tx.balance = currentBalance.toFixed(2);
-        });
-        // Adjust the last balance to match availableBalance if provided
-        if (availableBalance !== undefined && statement.transactions.length > 0) {
-            const lastTx = statement.transactions[statement.transactions.length - 1];
-            lastTx.balance = availableBalance.toFixed(2);
-        }
-    }
 
     const accountFolder = `./files/${accountNumber}`;
     mkdirp.sync(accountFolder);
 
     const { statementFiles, statementPath } = await generateFnbStatements({
-        statement,
-        accountFolder,
-        months: months || 1,
-        openBalance,
-        availableBalance
+        statements,
+        accountFolder
     });
 
     const bankStatementUrls =
@@ -601,7 +531,7 @@ export const generateBankStatement = async ({
     openBalance,
     months
 }: {
-    statementDetails: StatementData | TymeBankStatement[] | { statements: any[]; rawData: any };
+    statementDetails: StatementData | TymeBankStatement[] | FNBBankStatementType[] | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
     availableBalance?: number;
     bankType: BankType;
@@ -616,7 +546,7 @@ export const generateBankStatement = async ({
         } else if (bankType === 'CAPITEC') {
             result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData, openBalance, availableBalance });
         } else if (bankType === 'FNB') {
-            result = await processFnbBank({ statementDetails: statementDetails as any, payslipData, openBalance, availableBalance, months });
+            result = await processFnbBank({ statementDetails: statementDetails as any, payslipData });
         } else {
             result = await processStandardBank({
                 statementDetails: statementDetails as any,

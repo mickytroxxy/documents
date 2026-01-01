@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { StatementData } from '../handlers/standard/types';
 import { TymeBankStatement } from '../handlers/tymebank/sample';
+import { FNBBankStatementType } from '../handlers/fnb/sample';
 
 export type BankType = 'TYMEBANK' | 'FNB' | 'NEDBANK' | 'CAPITEC' | 'STANDARD' | 'ABSA';
 
@@ -25,7 +26,7 @@ export interface FinancialDataResponse {
     status: number;
     message: string;
     data?: {
-        statements: (StatementData | TymeBankStatement)[];
+        statements: (StatementData | TymeBankStatement | FNBBankStatementType)[];
         rawData?: any;
     };
     error?: string;

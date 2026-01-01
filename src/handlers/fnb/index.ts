@@ -8,7 +8,7 @@ import { FNBBankStatementType, Transaction } from './sample';
 import path from 'path';
 import { text } from 'body-parser';
 
-function formatDate(date: Date | string | number, format: 'short' | 'medium' | 'long'): string {
+export function formatDate(date: Date | string | number, format: 'short' | 'medium' | 'long'): string {
     const d = typeof date === 'string' ? new Date(date) : typeof date === 'number' ? new Date(date) : date;
     const year = d.getFullYear();
     const month = d.getMonth();
@@ -500,21 +500,7 @@ function renderLastPageFooter(
     const footerTopY = 56.3; // Y coordinate of page number (top of page footer)
     const gapBetweenTableAndFooter = 10; // gap used in drawing
     const availableSpace = bottomOfTable - gapBetweenTableAndFooter - footerTopY;
-    console.log('Last page footer check:', {
-        availableSpace,
-        footerHeight,
-        height,
-        pageBottomPadding,
-        currentY,
-        tableHeight,
-        pageNumber,
-        startY,
-        bottomOfTable,
-        footerTopY
-    });
     if (isOnFooterPage || availableSpace >= footerHeight) {
-        console.log('Rendering last page footer on same page');
-        // Enough space, render footer on this page
         const closingBalanceText = `Closing Balance`;
         const turnoverText = `Turnover for Statement Period`;
 
