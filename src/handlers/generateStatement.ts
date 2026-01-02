@@ -221,7 +221,8 @@ async function generateStandardStatement({
     console.log(statement?.transactions?.[statement?.transactions?.length - 2]);
     console.log(statement?.transactions?.pop());
     console.log(availableBalance);
-    const data = rebalanceStatement(statement, availableBalance, openBalance);
+    //const data = rebalanceStatement(statement, availableBalance, openBalance);
+    const data = rebalanceStatement(statement as StatementData, availableBalance, openBalance);
     const statementPath = await generateStandardBankStatement(outputFilePath, data);
     return { statementPath };
 }

@@ -16,6 +16,7 @@ export type FormStatementPrompt = {
     toDate?: string;
     companyName: string;
     rentAmount?: number;
+    comment?: string;
 };
 
 export const formStatementPrompt = ({
@@ -28,10 +29,21 @@ export const formStatementPrompt = ({
     salaryAmount = 0,
     averageMonthlySpending = 8000,
     physicalAddress,
-    companyName,
-    comment
-}: FormStatementPrompt & { comment?: string }) => {
+    comment = ''
+}: FormStatementPrompt) => {
+    /**
+     * =========================
+     * CORE CALCULATIONS
+     * =========================
+     */
+
+    // Total money leaving the account
     const totalPayments = averageMonthlySpending * months;
+
+    /**
+     * NON-NEGOTIABLE BALANCE LAW
+     * openingBalance + totalDeposits - totalPayments = availableBalance
+     */
     const totalDeposits = availableBalance - openBalance + totalPayments;
 
     const salaryTotal = salaryAmount * months;
@@ -46,42 +58,10 @@ export const formStatementPrompt = ({
         year: 'numeric'
     });
 
-    let prompt = `
+    return `
 You are a South African bank-statement generator.
 Your output MUST be mathematically perfect, internally consistent,
 and suitable for loan approval.
-The user works at ${companyName} so your salary deposits mainDescription can include the name
-
-================================================================
-MAINDESCRIPTION AND SUBDESCRIPTION NAMING RULES (STRICT)
-================================================================
-
-mainDescription rules:
-• CAN contain merchant names (e.g., "SHOPRITE", "ENGEN GARAGE")
-• CAN contain transaction types (e.g., "MONTHLY RENTAL", "ATM WITHDRAWAL")
-• CAN contain company names for salary deposits
-• MUST be descriptive of the main transaction purpose
-
-subDescription rules:
-• MUST NOT contain merchant names like "Shoprite purchase" or "Engen garage"
-• MUST follow standard bank statement requirements
-• MUST use standardized formats only:
-  - "PAYMENT TO" (for payments to recipients)
-  - "PAYMENT FROM" (for payments received from)
-  - "DEBIT CARD PURCHASE FROM" (for card purchases)
-  - "DEBIT CARD PURCHASE" (for online purchases)
-  - "AUTOBANK CASH DEPOSIT" (for ATM cash deposits)
-  - "CASH WITHDRAWAL - [LOCATION]" (for ATM withdrawals)
-  - "PREPAID MOBILE PURCHASE" (for airtime/data)
-  - "FEE: [FEE_TYPE]" (for fees)
-
-STRICT EXAMPLES:
-• ✅ CORRECT: mainDescription: "SHOPRITE SPRINGS", subDescription: "DEBIT CARD PURCHASE FROM"
-• ❌ WRONG: mainDescription: "SHOPRITE", subDescription: "SHOPRITE PURCHASE"
-• ✅ CORRECT: mainDescription: "MONTHLY RENTAL", subDescription: "PAYMENT TO"
-• ❌ WRONG: mainDescription: "RENT", subDescription: "RENT PAYMENT"
-• ✅ CORRECT: mainDescription: "FEE: INTERNATIONAL TRANSACTION", subDescription: "FEE: INTERNATIONAL TRANSACTION"
-• ❌ WRONG: mainDescription: "INTERNATIONAL FEE", subDescription: "TRANSACTION FEE"
 
 ================================================================
 ABSOLUTE DATE CONSTRAINT (HARD RULE)
@@ -120,11 +100,7 @@ Use these EXACT totals:
 • Creating a transaction that would cause insufficient funds
 
 THIS IS A HARD FAILURE CONDITION.
-If currentBalance < payment amount → YOU MUST ADD DEPOSITS FIRST TO COVER THE PAYMENT BEFORE MAKING THE PAYMENT.
-
-IMPORTANT:
-The balance of the LAST transaction MUST equal:
-${availableBalance.toFixed(2)}
+If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
 
 ================================================================
 DATE & SALARY RULES
@@ -140,6 +116,12 @@ Most recurring monthly payments MUST occur between:
 • 25th of the current month
 • and 5th of the following month
 
+This applies to:
+• Rent
+• Utilities
+• Subscriptions
+• Insurance-like payments
+
 Payments outside this window should be occasional only.
 
 ================================================================
@@ -150,47 +132,91 @@ Rent is MONEY LEAVING the account.
 mainDescription examples:
 • "MONTHLY RENTAL"
 • "RENTAL PAYMENT"
-• "RENT PAYMENT"
 
 subDescription MUST ALWAYS BE:
 "PAYMENT TO"
 
 Rules:
 • Occurs between the 1st and 3rd of each month
-• Amount range: 2000–12000 (must be 20–40% of salary)
+• Amount range: 4000–12000
 • SAME amount every month
 • NEVER mark rent as income
 • NEVER use "RENTAL INCOME"
-
-Opening balance is treated as CURRENT balance.
 
 ================================================================
 CARD PURCHASE CLASSIFICATION (MANDATORY)
 ================================================================
 
-LOCAL CARD PURCHASE:
+LOCAL CARD PURCHASE (garage, shop, POS):
+subDescription:
 "DEBIT CARD PURCHASE FROM"
 
-LOCAL ONLINE PURCHASE:
+LOCAL ONLINE PURCHASE (Takealot, local ecommerce):
+subDescription:
 "DEBIT CARD PURCHASE"
 
-INTERNATIONAL CARD PURCHASE:
+INTERNATIONAL CARD PURCHASE (Google, Facebook, Amazon, Apple, Meta):
+subDescription:
 "INT DEBIT CARD PURCHASE"
 
 FOR EVERY INTERNATIONAL CARD PURCHASE:
-Create the purchase, then immediately create:
+1️⃣ Create the purchase transaction
+2️⃣ IMMEDIATELY AFTER create a FEE transaction:
+
 payment: 11.83
 mainDescription: "FEE: INTERNATIONAL TRANSACTION"
 subDescription: "FEE: INTERNATIONAL TRANSACTION"
-
+ALL SALARY DEPOSIT, incoming funds not through ATM deposits must have a subDescription of PAYMENT FROM.
 ================================================================
 ATM CASH & FEES (CRITICAL)
 ================================================================
+
 ATM CASH DEPOSIT:
-subDescription: "AUTOBANK CASH DEPOSIT"
+mainDescription example:
+"SPRINGS NEW 3 13H07 409266375" (must be unique)
+subDescription:
+"AUTOBANK CASH DEPOSIT"
 
 AFTER EVERY ATM CASH DEPOSIT:
-"CASH WITHDRAWAL FEE"
+Create a TRAILING FEE transaction:
+
+mainDescription: "CASH WITHDRAWAL FEE"
+subDescription: "CASH WITHDRAWAL FEE"
+
+ATM DEPOSIT FEE CALCULATION:
+• 1200 → 31.80
+• 2300 → 51.80
+• Use proportional scaling for other values
+• Round to 2 decimals
+
+================================================================
+AIRTIME PURCHASE
+================================================================
+Airtime purchase:
+mainDescription:
+"VAS00161296940 TELKM0658016132"
+subDescription:
+"PREPAID MOBILE PURCHASE"
+
+IMMEDIATELY AFTER:
+Fee transaction:
+payment: 0.70
+mainDescription: "FEE: PREPAID MOBILE PURCHASE"
+subDescription: "FEE: PREPAID MOBILE PURCHASE"
+
+================================================================
+INCOMING MONEY RULES
+================================================================
+Incoming APP payment (NOT ATM):
+subDescription:
+"PAYSHAP PAYMENT FROM"
+OR
+"PAYMENT FROM"
+
+mainDescription:
+Sender name or reference
+
+ATM deposits MUST NEVER use these labels.
 
 ================================================================
 MINIMUM TRANSACTION COUNTS
@@ -206,64 +232,45 @@ Bank fees: ${months * 2}
 Transfers: ${Math.floor(months * 0.5)}
 
 ================================================================
-PROGRESSIVE BALANCING (ENFORCED, NATURAL)
-================================================================
-You MUST reach the final availableBalance gradually.
-
-• Never fix the balance with one transaction
-• Never repeat identical amounts consecutively
-• Never create obvious “balancing” transactions
-• Spread corrections across multiple realistic activities
-
-By the FINAL transactions:
-• Remaining difference must be very small
-• Final transaction must appear routine
-• Final balance MUST equal availableBalance
-
-================================================================
-BALANCE UPDATE ALGORITHM (MANDATORY)
+BALANCE UPDATE ALGORITHM (NON-NEGOTIABLE)
 ================================================================
 currentBalance = openingBalance
 
-For EACH transaction:
-• deposit → currentBalance += deposit
-• payment → currentBalance -= payment
+For EACH transaction (chronological):
+• if deposit > 0 → currentBalance += deposit
+• if payment > 0 → currentBalance -= payment
 • transaction.balance = currentBalance
 
-Payments must NEVER exceed currentBalance.
+🚫 At NO POINT may currentBalance drop below 0
+🚫 Payments MUST NEVER exceed currentBalance
 
-================================================================
-FINAL SELF-CHECK (MANDATORY — DO NOT SKIP)
-================================================================
-Before returning JSON, YOU MUST:
-
-1. Recalculate currentBalance from openingBalance
-2. Iterate through ALL transactions in order
-3. Recompute every transaction.balance
-4. Confirm LAST transaction.balance === ${availableBalance.toFixed(2)}
-
-❌ If NOT equal:
-→ Adjust earlier realistic transactions
-→ Recalculate balances
-→ Repeat validation
-→ ONLY return JSON when correct
+FINAL currentBalance MUST EQUAL:
+${availableBalance.toFixed(2)}
 
 ================================================================
 OUTPUT REQUIREMENTS
 ================================================================
 • EXACTLY ${transactionCount} transactions
-• Two decimal places
+• Two decimal places only
 • NO currency symbols
 • RETURN ONLY valid JSON
 • Structure MUST match sampleStatementData EXACTLY
+USE ${physicalAddress} AS THE ACCOUNT HOLDER'S ADDRESS.
+This is the format ['Address:', '3260 SUPER MEGA ST', 'Soweto Ext', 'Orlando', '1112', 'ZA'], split by commas.
+STATEMENT PERIOD MUST BE IN THE FORMAT:
+from: "DD MMM YYYY"
+to: "DD MMM YYYY"
 
+INCLUDE THIS ADDITIONAL COMMENT IN THE STATEMENT IF APPLICABLE. THIS IS ADDITIONAL CONTEXT FROM THE USER:
+"${comment}"
 REFERENCE STRUCTURE:
 ${JSON.stringify(sampleStatementData, null, 2)}
+
+FINAL VALIDATION STEP (MANDATORY):
+Before returning JSON:
+✔ Validate running balance
+✔ Validate no overdrafts
+✔ Validate final balance EXACT MATCH
+✔ Fix any violations BEFORE returning
 `;
-
-    if (comment) {
-        prompt += `\n\nADDITIONAL USER REQUIREMENTS: ${comment}\n\nIMPORTANT: Even user requirements must follow the mainDescription/subDescription naming rules above. No merchant names in subDescription!`;
-    }
-
-    return prompt;
 };

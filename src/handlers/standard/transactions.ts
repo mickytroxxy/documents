@@ -110,9 +110,9 @@ export const payslipSample: PayslipData[] = [
 
 export const sampleStatementData: StatementData = {
     accountNumber: '10 4674 4888 1',
-    accountHolder: 'MR. JOHNSON NDLOVU',
+    accountHolder: 'MR. SAMPLE CUSTOMER',
     productName: 'MYMOACC',
-    address: ['Address:', '3860 SUPERCHARGER ST', 'Devland Ext', 'Freedom Park', '1832', 'ZA'],
+    address: ['Address:', '3260 SUPER MEGA ST', 'Soweto Ext', 'Orlando', '1112', 'ZA'],
     statementPeriod: {
         from: '08 Sep 2025',
         to: '07 Dec 2025'
@@ -121,7 +121,7 @@ export const sampleStatementData: StatementData = {
         {
             date: '09 Sep 25',
             mainDescription: 'SHOPRITE SPRINGS',
-            subDescription: '5190*6375 DEBIT CARD PURCHASE',
+            subDescription: '5190*6372 DEBIT CARD PURCHASE',
             payment: '850.50',
             deposit: '',
             balance: '4,149.50'

@@ -3,18 +3,32 @@
 import fontkit from 'fontkit';
 import path from 'path';
 import fs from 'fs';
-import { PDFDocument, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage } from 'pdf-lib';
 import { COLORS, TABLE_CONFIG } from '../standard/constants';
 import { StatementData } from '../standard/types';
 import { renderAccountDetails } from '../standard/renderAccountDetails';
 import { renderTable } from '../standard/renderTable';
 import { renderSummary } from '../standard/renderSummary';
+import { formatDate } from '../fnb';
+
+const formatAccountNumber = (accountNumber: string): string => {
+    // Assuming 11-digit account number, format as 2-2-3-3-1
+    if (accountNumber.length === 11) {
+        return `${accountNumber.slice(0, 2)}  ${accountNumber.slice(2, 4)}  ${accountNumber.slice(4, 7)}  ${accountNumber.slice(
+            7,
+            10
+        )}  ${accountNumber.slice(10)}`;
+    }
+    return accountNumber; // Fallback if not 11 digits
+};
 
 export const generateStandardBankStatement = async (outputFilePath: string, statementDetails: StatementData) => {
     const topOffset = 130;
     const lineGap = 15.3;
     const left = TABLE_CONFIG.leftMargin;
     const rightMargin = TABLE_CONFIG.rightMargin;
+    const pageHeight = 842; // A4 height
+    const startY = pageHeight - topOffset;
     const inPath = path.resolve('./files/statement.pdf');
     const existingPdfBytes = new Uint8Array(fs.readFileSync(inPath));
     const accountFolder = path.dirname(outputFilePath);
@@ -23,6 +37,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
     const firstPageCount = 15;
     const otherPageCount = 17;
     const NON_FIRST_PAGE_OFFSET = 60;
+    const formattedAccountNumber = formatAccountNumber(statementDetails.accountNumber);
 
     let totalPages = 0;
     if (totalTx <= firstPageCount) {
@@ -30,7 +45,17 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
     } else {
         totalPages = 1 + Math.ceil((totalTx - firstPageCount) / otherPageCount);
     }
-    const totalPagesWithSummary = totalPages + 1;
+    // Calculate if summary fits on the last page
+    const lastPageStart = totalPages === 1 ? 0 : firstPageCount + (totalPages - 2) * otherPageCount;
+    const lastPageEnd = totalPages === 1 ? Math.min(firstPageCount, totalTx) : Math.min(lastPageStart + otherPageCount, totalTx);
+    const numRowsLastPage = lastPageEnd - lastPageStart;
+    const tableStartYLast = (totalPages === 1 ? startY : startY + NON_FIRST_PAGE_OFFSET) - 110;
+    const bottomOfTable = tableStartYLast - TABLE_CONFIG.headerHeight - TABLE_CONFIG.rowHeight * numRowsLastPage;
+    const summaryHeight = 130; // approximate height of summary
+    const bottomPadding = 200;
+    const summaryFits = bottomOfTable - summaryHeight > bottomPadding;
+
+    const totalPagesWithSummary = summaryFits ? totalPages : totalPages + 1;
 
     const pageDescriptors = Array.from({ length: totalPagesWithSummary }).map((_, i) => {
         const pageNumber = i + 1;
@@ -71,7 +96,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                 const valueXSummary = left + maxLabelWidthSummary + 5;
                 const accountYSummary = summaryStartY;
                 firstPage.drawText(labelSummary, { x: left, y: accountYSummary, size: fontSizeAccount, font, color: COLORS.bankBlue });
-                firstPage.drawText(statementDetails.accountNumber, {
+                firstPage.drawText(formattedAccountNumber, {
                     x: valueXSummary,
                     y: accountYSummary,
                     size: fontSizeAccount,
@@ -88,7 +113,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                     firstPage.drawText(dateLabel, { x: xPos, y: dateY, size: fontSizeDateSummary, font, color: COLORS.bankBlue });
                 });
 
-                firstPage.drawText(formatStampDate(Date.now()), {
+                firstPage.drawText(formatDate(Date.now(), 'medium'), {
                     x: 229.5,
                     y: height - 112,
                     size: 10,
@@ -96,9 +121,22 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                     color: COLORS.stampColor
                 });
 
+                const summaryY = summaryStartY - 120;
+                renderSummary(
+                    firstPage,
+                    statementDetails.summary,
+                    { fontBold: fontBold, font: font },
+                    {
+                        y: summaryY,
+                        left,
+                        width: width,
+                        rightMargin
+                    }
+                );
+
                 const disclaimerText =
                     'Please verify all transactions reflected on this statement and notify any discrepancies to the bank as soon as possible.';
-                const disclaimerY = summaryStartY - 50;
+                const disclaimerY = summaryY + 90;
                 firstPage.drawText(disclaimerText, {
                     x: left,
                     y: disclaimerY,
@@ -108,24 +146,12 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                     maxWidth: width - left - rightMargin,
                     lineHeight: 14
                 });
-
-                renderSummary(
-                    firstPage,
-                    statementDetails.summary,
-                    { fontBold: fontBold, font: font },
-                    {
-                        y: disclaimerY - 80,
-                        left,
-                        width: width,
-                        rightMargin
-                    }
-                );
             } else {
                 if (pageNumber === 1) {
                     renderAccountDetails(
                         firstPage,
                         {
-                            accountNumber: statementDetails.accountNumber,
+                            accountNumber: formattedAccountNumber,
                             accountHolder: statementDetails.accountHolder,
                             productName: statementDetails.productName,
                             address: statementDetails.address,
@@ -147,7 +173,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                     const valueX = left + maxLabelWidth + 5;
                     const y = startY;
                     firstPage.drawText(label, { x: left, y, size: fontSize, font, color: COLORS.bankBlue });
-                    firstPage.drawText(statementDetails.accountNumber, { x: valueX, y, size: fontSize, font: fontBold, color: COLORS.bankBlue });
+                    firstPage.drawText(formattedAccountNumber, { x: valueX, y, size: fontSize, font: fontBold, color: COLORS.bankBlue });
                     const dateRows = [`From: ${statementDetails.statementPeriod.from}`, `To: ${statementDetails.statementPeriod.to}`];
                     const fontSizeDate = fontSize - 1;
                     dateRows.forEach((label, idx) => {
@@ -160,7 +186,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                 const transactionHeaderY = (pageNumber === 1 ? startY : startY + NON_FIRST_PAGE_OFFSET) - 110;
                 const balanceLabel = 'Available Balance:';
                 const balanceValue = `R${statementDetails?.summary.availableBalance}`;
-                firstPage.drawText(formatStampDate(Date.now()), {
+                firstPage.drawText(formatDate(Date.now(), 'medium'), {
                     x: 229.5,
                     y: height - 112,
                     size: 10,
@@ -227,7 +253,7 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                 const tableWidth = tableRight - tableLeft;
 
                 const pageTx = transactions.slice(start, end);
-                renderTable(
+                const tableBottomY = renderTable(
                     firstPage,
                     pageTx,
                     { font, fontBold },
@@ -238,6 +264,36 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
                         bottomPadding: 0
                     }
                 );
+
+                // If summary fits on this page, render it below the table
+                if (pageNumber === totalPages && summaryFits) {
+                    const summaryY = tableBottomY - 78;
+                    renderSummary(
+                        firstPage,
+                        statementDetails.summary,
+                        { fontBold: fontBold, font: font },
+                        {
+                            y: summaryY,
+                            left,
+                            width: width,
+                            rightMargin
+                        }
+                    );
+
+                    // Add disclaimer above the summary
+                    const disclaimerText =
+                        'Please verify all transactions reflected on this statement and notify any discrepancies to the bank as soon as possible.';
+                    const disclaimerY = summaryY + 80;
+                    firstPage.drawText(disclaimerText, {
+                        x: left,
+                        y: disclaimerY,
+                        size: 10,
+                        font: font,
+                        color: COLORS.blackColor,
+                        maxWidth: width - left - rightMargin,
+                        lineHeight: 14
+                    });
+                }
             }
 
             renderFooter(firstPage, pageNumber, totalPagesWithSummary, { font }, { left, bottom: 12, width });
@@ -269,14 +325,6 @@ export const generateStandardBankStatement = async (outputFilePath: string, stat
     }
 
     return mergedPath;
-};
-
-const formatStampDate = (dateInput: string | Date | number) => {
-    const d = new Date(dateInput);
-    const day = d.getDate().toString().padStart(2, '0');
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day} ${'Dec'} ${year}`;
 };
 
 const renderFooter = (

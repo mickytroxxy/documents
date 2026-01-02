@@ -237,7 +237,7 @@ export const get_companies = async (req: Request, res: Response): Promise<void> 
 export const get_banks = async (req: Request, res: Response): Promise<void> => {
     const bankTypeOptions = [
         { value: 'standard', label: 'Standard Bank' },
-        { value: 'tymebank', label: 'TymeBank' },
+        { value: 'tymebank', label: 'TymeBank Business' },
         { value: 'FNB', label: 'FNB' },
         { value: 'CAPITEC', label: 'Capitec' }
     ];

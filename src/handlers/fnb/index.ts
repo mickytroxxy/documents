@@ -18,10 +18,10 @@ export function formatDate(date: Date | string | number, format: 'short' | 'medi
         return `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`;
     } else if (format === 'medium') {
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${day} ${monthNames[month]} ${year}`;
+        return `${String(day).padStart(2, '0')} ${monthNames[month]} ${year}`;
     } else if (format === 'long') {
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        return `${day} ${monthNames[month]} ${year}`;
+        return `${String(day).padStart(2, '0')} ${monthNames[month]} ${year}`;
     }
     return '';
 }

@@ -146,7 +146,7 @@ REQUIRED TRANSACTION TYPES (${transactionCount} TOTAL)
    • CarTrack: R100.00-R159.00
    • Insurance: R250.00-R450.00
    • Funeral: R150.00-R250.00
-   • Home Loans: R800.00-R1500.00
+   • Home Loans: R4000.00-R12000.00
    • Gym: R299.00-R399.00
    • Successful fee: -3.00
    • Failed fee (occasional): -6.00
@@ -215,13 +215,16 @@ CRITICAL FORMATTING:
 • Use ONLY realistic Capitec descriptions
 
 =================================================================
-BALANCE CALCULATION RULES
+BALANCE CALCULATION RULES (CRITICAL - MUST FOLLOW EXACTLY)
 =================================================================
 • Starting balance: R${openBalance.toFixed(2)}
-• Each transaction: new_balance = previous + money_in - money_out - fee
-• Final balance MUST be: R${availableBalance.toFixed(2)}
-• Balance can go negative temporarily
+• Each transaction: new_balance = previous_balance + money_in - money_out - fee
+• money_in is positive (e.g., 20000.00), money_out is negative (e.g., -300.00), fee is negative (e.g., -1.00)
+• Final balance in the LAST transaction MUST EXACTLY be: R${availableBalance.toFixed(2)}
+• Balance can go negative temporarily, but recover with deposits
 • Include 2-3 insufficient funds scenarios with -6.00 fees
+• NO balance adjustments or corrections - calculate progressively and accurately
+• If the final balance doesn't match R${availableBalance.toFixed(2)}, the response is INVALID
 
 =================================================================
 REALISTIC VALUES (WITH DECIMALS)
@@ -261,7 +264,7 @@ CATEGORIES TO USE (EXACT)
 - Uncategorised
 
 =================================================================
-OUTPUT REQUIREMENTS
+OUTPUT REQUIREMENTS (STRICT)
 =================================================================
 • EXACTLY ${transactionCount} transactions
 • NO future dates
@@ -270,11 +273,13 @@ OUTPUT REQUIREMENTS
 • NO adjustment/balance-fixing descriptions
 • All money_out values negative: -300.00, -500.00
 • All fee values negative: -1.00, -6.00, -10.00
-• Final balance: R${availableBalance.toFixed(2)}
-• RETURN ONLY JSON ARRAY, NO EXPLANATIONS
+• All money_in values positive: 20000.00, 500.00
+• Final balance in the last transaction MUST EXACTLY be: R${availableBalance.toFixed(2)}
+• RETURN ONLY JSON OBJECT with transactions array and address, NO EXPLANATIONS
 • NO additional text before or after JSON
-. We also need the physical address in the output
-. We also need money_in live better
+• We also need the physical address in the output
+• We also need money_in live better round-up transfers
+• BALANCE MUST BE CALCULATED PROGRESSIVELY: balance = previous_balance + money_in + money_out + fee (since money_out and fee are negative)
 =================================================================
 EXAMPLE TRANSACTIONS
 =================================================================
