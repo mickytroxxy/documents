@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'fs';
 import { mkdirp } from 'mkdirp';
-import { generatePayslipPDF } from './generatePayslip';
 import { rebalanceStatement } from '../helpers/statementBalancer';
 import { secrets } from '../server';
 import { PayslipData, StatementData } from './standard/types';
@@ -12,6 +11,16 @@ import { TymeBankStatement } from './tymebank/sample';
 import { generateCapitecBankPDF } from './capitec';
 import { generateFNBBankPDF } from './fnb';
 import { FNBBankStatementType } from './fnb/sample';
+import { generatePayslip5PDF } from './payslips/cmp-005';
+import { generatePayslip3PDF } from './payslips/cmp-003';
+import { generatePayslip2PDF } from './payslips/cmp-002';
+import { generatePayslip4PDF } from './payslips/cmp-004';
+import { generatePayslipPDF } from './payslips/cmp-001';
+import { generatePayslip6PDF } from './payslips/cmp-006';
+import { generatePayslip7PDF } from './payslips/cmp-007';
+import { generatePayslip8PDF } from './payslips/cmp-008';
+import { generatePayslip9PDF } from './payslips/cmp-009';
+import { generatePayslip10PDF } from './payslips/cmp-0010';
 
 // Helper: rebalance TymeBank statements to enforce opening balance and continuity
 function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: number): TymeBankStatement[] {
@@ -100,7 +109,7 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
 /**
  * Shared payslip generation per account folder.
  */
-async function generatePayslipsForAccount(accountFolder: string, payslipData?: PayslipData[]): Promise<string[]> {
+async function generatePayslipsForAccount(accountFolder: string, payslipData?: PayslipData[], companyId?: string): Promise<string[]> {
     if (!payslipData || !payslipData.length) return [];
     try {
         const urls: string[] = [];
@@ -108,7 +117,27 @@ async function generatePayslipsForAccount(accountFolder: string, payslipData?: P
         for (let i = 0; i < payslipsToGenerate.length; i++) {
             const payslip = payslipsToGenerate[i];
             if (payslip) {
-                const pdfPath = await generatePayslipPDF(payslip, i, `${accountFolder}/payslip_${i + 1}.pdf`);
+                let pdfPath = '';
+                if (companyId === 'cmp-001') {
+                    pdfPath = await generatePayslipPDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-002') {
+                    pdfPath = await generatePayslip2PDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-003') {
+                    pdfPath = await generatePayslip3PDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-004') {
+                    pdfPath = await generatePayslip4PDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-005') {
+                    pdfPath = await generatePayslip5PDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-006') {
+                    pdfPath = await generatePayslip6PDF(payslip, i, accountFolder);
+                } else if (companyId === 'cmp-007') {
+                    pdfPath = await generatePayslip7PDF(payslip, i, accountFolder);
+                } else {
+                    //randomly pick one of the available templates
+                    const templates = [generatePayslip8PDF, generatePayslip9PDF, generatePayslip10PDF];
+                    const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+                    pdfPath = await randomTemplate(payslip, i, accountFolder);
+                }
                 urls.push(pdfPath);
                 console.log(`Payslip ${i + 1} generated: ${pdfPath}`);
             }
@@ -243,11 +272,13 @@ function mapPayslipUrls(accountNumber: string, payslipPaths: string[]): string[]
 async function processTymeBank({
     statementDetails,
     payslipData,
-    openBalance
+    openBalance,
+    companyId
 }: {
     statementDetails: TymeBankStatement[] | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
     openBalance?: number;
+    companyId: string;
 }) {
     let statements: TymeBankStatement[];
     let accountNumber = '';
@@ -286,7 +317,7 @@ async function processTymeBank({
             ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`]
             : [];
 
-    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData, companyId);
     const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
 
     return { bankStatementUrls, payslipUrls };
@@ -299,12 +330,14 @@ async function processCapitecBank({
     statementDetails,
     payslipData,
     openBalance,
-    availableBalance
+    availableBalance,
+    companyId
 }: {
     statementDetails: any | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
     openBalance?: number;
     availableBalance?: number;
+    companyId: string;
 }) {
     let statement: any;
     let accountNumber = '';
@@ -355,7 +388,7 @@ async function processCapitecBank({
     const { statementPath } = await generateCapitecStatement({ statement, accountFolder });
     const bankStatementUrls = statementPath ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`] : [];
 
-    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData, companyId);
     const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
 
     return { bankStatementUrls, payslipUrls };
@@ -426,10 +459,12 @@ async function generateFnbStatements({
  */
 async function processFnbBank({
     statementDetails,
-    payslipData
+    payslipData,
+    companyId
 }: {
     statementDetails: FNBBankStatementType[] | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
+    companyId: string;
 }) {
     let statements: FNBBankStatementType[];
     let accountNumber = '';
@@ -468,7 +503,7 @@ async function processFnbBank({
             ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`]
             : [];
 
-    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData, companyId);
     const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
 
     return { bankStatementUrls, payslipUrls };
@@ -481,12 +516,14 @@ async function processStandardBank({
     statementDetails,
     payslipData,
     availableBalance,
-    openBalance
+    openBalance,
+    companyId
 }: {
     statementDetails: StatementData | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
     availableBalance?: number;
     openBalance?: number;
+    companyId: string;
 }) {
     let statement: StatementData;
     let accountNumber = '';
@@ -519,7 +556,7 @@ async function processStandardBank({
     });
     const bankStatementUrls = statementPath ? [`${secrets?.BASE_URL}/${accountNumber}/${path.basename(statementPath)}`] : [];
 
-    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData);
+    const payslipPaths = await generatePayslipsForAccount(accountFolder, payslipData, companyId);
     const payslipUrls = mapPayslipUrls(accountNumber, payslipPaths);
 
     return { bankStatementUrls, payslipUrls };
@@ -531,7 +568,7 @@ export const generateBankStatement = async ({
     availableBalance,
     bankType,
     openBalance,
-    months
+    companyId
 }: {
     statementDetails: StatementData | TymeBankStatement[] | FNBBankStatementType[] | { statements: any[]; rawData: any };
     payslipData?: PayslipData[];
@@ -539,22 +576,24 @@ export const generateBankStatement = async ({
     bankType: BankType;
     openBalance?: number;
     months?: number;
+    companyId: any;
 }) => {
     try {
         let result: { bankStatementUrls: string[]; payslipUrls: string[] };
 
         if (bankType === 'TYMEBANK') {
-            result = await processTymeBank({ statementDetails: statementDetails as any, payslipData, openBalance });
+            result = await processTymeBank({ statementDetails: statementDetails as any, payslipData, openBalance, companyId });
         } else if (bankType === 'CAPITEC') {
-            result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData, openBalance, availableBalance });
+            result = await processCapitecBank({ statementDetails: statementDetails as any, payslipData, openBalance, availableBalance, companyId });
         } else if (bankType === 'FNB') {
-            result = await processFnbBank({ statementDetails: statementDetails as any, payslipData });
+            result = await processFnbBank({ statementDetails: statementDetails as any, payslipData, companyId });
         } else {
             result = await processStandardBank({
                 statementDetails: statementDetails as any,
                 payslipData,
                 availableBalance,
-                openBalance
+                openBalance,
+                companyId
             });
         }
 

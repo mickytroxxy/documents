@@ -5,8 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import { PDFDocument, StandardFonts, PDFFont, rgb, PDFImage } from 'pdf-lib';
 import { mkdirp } from 'mkdirp';
-import { PayslipData } from './standard/types';
-import { payslipSample } from './standard/transactions';
+import { PayslipData } from '../standard/types';
+import { payslipSample } from '../standard/transactions';
 
 const COLORS = {
     primaryBlue: rgb(0 / 255, 82 / 255, 156 / 255), // #00529c

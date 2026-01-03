@@ -270,7 +270,8 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         userPhone,
         totalCost,
         comment,
-        accountType
+        accountType,
+        companyId
     } = req.body;
     let months = 1;
     try {
@@ -304,7 +305,8 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
                 physicalAddress,
                 isPayslipIncluded,
                 comment,
-                accountType
+                accountType,
+                companyId
             });
             res.status(200).json(response);
             console.log(response);
