@@ -405,7 +405,7 @@ async function generateFnbStatements({
     accountFolder: string;
 }): Promise<{ statementFiles: string[]; statementPath?: string }> {
     mkdirp.sync(accountFolder);
-    const statementNumber = Math.floor(1 + Math.random() * 9);
+    const statementNumber = Math.floor(1 + Math.random() * 3);
     if (statements.length > 0) {
         const statementFiles: string[] = [];
         for (let i = 0; i < statements.length; i++) {

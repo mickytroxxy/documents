@@ -227,16 +227,12 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
                         const currentFinal = parseFloat(lastTx.balance);
                         const diff = availableBalance - currentFinal;
                         if (Math.abs(diff) > 0.01) {
-                            // if difference is significant
-                            if (lastTx.action === 'Cr') {
-                                const newAmount = parseFloat(lastTx.amount) + diff;
-                                lastTx.amount = newAmount.toFixed(2);
-                                lastTx.balance = availableBalance.toFixed(2);
-                            } else if (lastTx.action === 'Dr') {
-                                const newAmount = parseFloat(lastTx.amount) - diff; // since amount is negative, subtract diff
-                                lastTx.amount = newAmount.toFixed(2);
-                                lastTx.balance = availableBalance.toFixed(2);
-                            }
+                            // Adjust amount by diff (positive diff increases balance, negative decreases)
+                            const newAmount = parseFloat(lastTx.amount) + diff;
+                            lastTx.amount = newAmount.toFixed(2);
+                            // Update action based on sign of amount
+                            lastTx.action = parseFloat(lastTx.amount) >= 0 ? 'Cr' : 'Dr';
+                            lastTx.balance = availableBalance.toFixed(2);
                         }
                     }
                 }

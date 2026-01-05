@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { handleDocumentGeneration } from './standard/docgen';
 import { authenticate } from './auth';
 import { authenticateUser, updateData } from '../helpers/api';
+import { parse } from 'path';
 export type DocumentConfig = {
     documentType: 'BANK_STATEMENT' | 'PAYSLIP';
     price: number;
@@ -279,7 +280,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         if (userInfo?.length > 0) {
             const currentBalance = parseFloat(userInfo?.[0]?.balance);
             if (currentBalance >= parseFloat(totalCost)) {
-                months = 3;
+                months = parseInt(mnth);
             }
             const response = await handleDocumentGeneration({
                 accountHolder,
@@ -310,7 +311,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
             });
             res.status(200).json(response);
             console.log(response);
-            if (months == 3) {
+            if (currentBalance >= parseFloat(totalCost)) {
                 const balance = (currentBalance - parseFloat(totalCost)).toString();
                 await updateData('users', userPhone, { balance });
             }
