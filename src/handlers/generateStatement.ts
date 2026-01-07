@@ -110,6 +110,7 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
  * Shared payslip generation per account folder.
  */
 async function generatePayslipsForAccount(accountFolder: string, payslipData?: PayslipData[], companyId?: string): Promise<string[]> {
+    console.log(`Generating payslips for company ID: ${companyId}`);
     if (!payslipData || !payslipData.length) return [];
     try {
         const urls: string[] = [];
