@@ -110,7 +110,6 @@ function rebalanceTymeStatements(statements: TymeBankStatement[], opening?: numb
  * Shared payslip generation per account folder.
  */
 async function generatePayslipsForAccount(accountFolder: string, payslipData?: PayslipData[], companyId?: string): Promise<string[]> {
-    console.log(`Generating payslips for company ID: ${companyId}`);
     if (!payslipData || !payslipData.length) return [];
     try {
         const urls: string[] = [];
@@ -140,7 +139,6 @@ async function generatePayslipsForAccount(accountFolder: string, payslipData?: P
                     pdfPath = await randomTemplate(payslip, i, accountFolder);
                 }
                 urls.push(pdfPath);
-                console.log(`Payslip ${i + 1} generated: ${pdfPath}`);
             }
         }
         return urls;
@@ -194,14 +192,11 @@ async function generateTymeBankStatements({
 
             const monthFileName = `bankstatement_${monthName}_${year}.pdf`;
             const monthOutputPath = path.resolve(`${accountFolder}/${monthFileName}`);
-
-            console.log(`Generating TymeBank PDF for ${monthName} ${year} at ${monthOutputPath}`);
             await generateTymeBankPDF(individualStatement, monthOutputPath, {
                 includeLegalText: i === fixedStatements.length - 1,
                 includeClosingBorder: i === fixedStatements.length - 1,
                 includeClosingRow: i === fixedStatements.length - 1
             });
-            console.log(`Successfully generated PDF at ${monthOutputPath}`);
 
             if (fs.existsSync(monthOutputPath)) {
                 console.log(`File exists: ${monthOutputPath}, size: ${fs.statSync(monthOutputPath).size} bytes`);
@@ -248,9 +243,6 @@ async function generateStandardStatement({
     openBalance?: number;
 }): Promise<{ statementPath: string }> {
     const outputFilePath = path.resolve(`${accountFolder}/bankstatement.pdf`);
-    console.log(statement?.transactions?.[statement?.transactions?.length - 2]);
-    console.log(statement?.transactions?.pop());
-    console.log(availableBalance);
     //const data = rebalanceStatement(statement, availableBalance, openBalance);
     const data = rebalanceStatement(statement as StatementData, availableBalance, openBalance);
     const statementPath = await generateStandardBankStatement(outputFilePath, data);
@@ -433,10 +425,7 @@ async function generateFnbStatements({
             const fileName = `fnb_statement_${periodFrom}_${periodTo}_${year}.pdf`;
             const outputPath = path.resolve(`${accountFolder}/${fileName}`);
             try {
-                console.log(`Generating FNB PDF for statement ${i + 1} at ${outputPath}`);
-
                 await generateFNBBankPDF(statementData, statementNumber + i, outputPath);
-                console.log(`Successfully generated PDF at ${outputPath}`);
             } catch (error) {
                 console.error(`Failed to generate PDF for statement ${i + 1}:`, error);
                 continue;
@@ -479,13 +468,9 @@ async function processFnbBank({
         rawAccountNumber = rawAcc;
         accountHolder = holder;
         accountNumber = rawAcc?.replace(/\s+/g, '') || '';
-        console.log('Statement details received:', statementDetails);
-        console.log('Extracted account number:', accountNumber);
     } else {
         statements = statementDetails as FNBBankStatementType[];
         accountNumber = statements[0]?.statement_info?.account_number?.replace(/\s+/g, '') || '';
-        console.log('Statement details received:', statementDetails);
-        console.log('Extracted account number:', accountNumber);
     }
     if (!accountNumber) throw new Error('Missing account number for FNB');
 

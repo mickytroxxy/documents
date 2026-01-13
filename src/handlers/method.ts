@@ -229,7 +229,6 @@ export const companies: CompanyInfo[] = [
 ];
 
 export const get_countries = async (req: Request, res: Response): Promise<void> => {
-    console.log('Fetching countries...');
     res.status(200).json({ message: 'Countries fetched successfully', status: 1, data: countries });
 };
 export const get_companies = async (req: Request, res: Response): Promise<void> => {
@@ -310,7 +309,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
                 companyId
             });
             res.status(200).json(response);
-            console.log(response);
+            console.log(response, 'final response');
             if (currentBalance >= parseFloat(totalCost)) {
                 const balance = (currentBalance - parseFloat(totalCost)).toString();
                 await updateData('users', userPhone, { balance });

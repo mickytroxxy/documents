@@ -183,7 +183,6 @@ export const handleDocumentGeneration = async ({
     }
     // Add title to account holder name in the required format (e.g., "MR LAMECK NDHLOVU")
     const accountHolderWithTitle = title ? `${title.toUpperCase()} ${accountHolder.toUpperCase()}` : accountHolder.toUpperCase();
-    console.log(payslipData?.[0], isPayslipIncluded);
     const financialData = await generateStatementData({
         accountHolder: accountHolderWithTitle,
         accountNumber,
