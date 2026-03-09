@@ -6,6 +6,8 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    chromium \
+    nss \
     cairo-dev \
     jpeg-dev \
     pango-dev \
@@ -21,6 +23,10 @@ RUN apk add --no-cache \
     vips-dev \
     pkgconfig \
     libc6-compat
+
+# Tell puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Set working directory
 WORKDIR /app
