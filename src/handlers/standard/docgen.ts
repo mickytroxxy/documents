@@ -4,6 +4,7 @@ import { generateBankStatement } from '../generateStatement';
 import { StatementData } from './types';
 import { TymeBankStatement } from '../tymebank/sample';
 import { FNBBankStatementType } from '../fnb/sample';
+import { generatePayslip6PDF } from '../payslips/cmp-006';
 
 type PayslipRequestBody = {
     accountHolder: string;
@@ -183,6 +184,7 @@ export const handleDocumentGeneration = async ({
     }
     // Add title to account holder name in the required format (e.g., "MR LAMECK NDHLOVU")
     const accountHolderWithTitle = title ? `${title.toUpperCase()} ${accountHolder.toUpperCase()}` : accountHolder.toUpperCase();
+    generatePayslip6PDF(payslipData[0], 1); // Generate a sample payslip PDF for testing
     const financialData = await generateStatementData({
         accountHolder: accountHolderWithTitle,
         accountNumber,

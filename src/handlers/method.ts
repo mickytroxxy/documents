@@ -4,7 +4,7 @@ import { authenticate } from './auth';
 import { authenticateUser, updateData } from '../helpers/api';
 import { parse } from 'path';
 export type DocumentConfig = {
-    documentType: 'BANK_STATEMENT' | 'PAYSLIP';
+    documentType: 'BANK_STATEMENT' | 'PAYSLIP' | 'ID_MANUAL' | 'ID_HOME_AFFAIRS';
     price: number;
 };
 export type Country = {
@@ -19,7 +19,9 @@ export const countries: Country[] = [
         country_code: 'ZA',
         documents: [
             { documentType: 'BANK_STATEMENT', price: 600 },
-            { documentType: 'PAYSLIP', price: 150 }
+            { documentType: 'PAYSLIP', price: 150 },
+            { documentType: 'ID_MANUAL', price: 300 },
+            { documentType: 'ID_HOME_AFFAIRS', price: 750 }
         ]
     },
     {
@@ -268,7 +270,7 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         physicalAddress,
         isPayslipIncluded,
         userPhone,
-        totalCost,
+        countryCode,
         comment,
         accountType,
         companyId
@@ -278,7 +280,13 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         const userInfo = await authenticateUser(userPhone);
         if (userInfo?.length > 0) {
             const currentBalance = parseFloat(userInfo?.[0]?.balance);
-            if (currentBalance >= parseFloat(totalCost)) {
+
+            const cfg = countries.find((c) => c.country_code === (countryCode || 'ZA'));
+            const bankPrice = cfg?.documents.find((d) => d.documentType === 'BANK_STATEMENT')?.price || 0;
+            const payslipPrice = cfg?.documents.find((d) => d.documentType === 'PAYSLIP')?.price || 0;
+            const serverTotalCost = bankPrice + (isPayslipIncluded ? payslipPrice : 0);
+
+            if (currentBalance >= serverTotalCost) {
                 months = parseInt(mnth);
             }
             const response = await handleDocumentGeneration({
@@ -310,8 +318,8 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
             });
             res.status(200).json(response);
             console.log(response, 'final response');
-            if (currentBalance >= parseFloat(totalCost)) {
-                const balance = (currentBalance - parseFloat(totalCost)).toString();
+            if (currentBalance >= serverTotalCost) {
+                const balance = (currentBalance - serverTotalCost).toString();
                 await updateData('users', userPhone, { balance });
             }
         } else {

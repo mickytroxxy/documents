@@ -49,6 +49,11 @@ COPY files/capitec/input.pdf ./files/capitec/
 COPY files/fnb/input.pdf ./files/fnb/
 COPY files/capitec/input2.pdf ./files/capitec/
 
+# Copy ID templates/assets (front & back templates, PSDs, and sample assets)
+COPY src/handlers/ids/*.psd ./src/handlers/ids/
+COPY src/handlers/ids/*.png ./src/handlers/ids/
+COPY src/handlers/ids/signatures/ ./src/handlers/ids/signatures/
+
 # Normalize font filename casing to match runtime expectations
 RUN if [ -f "./files/fonts/arial-Bold.ttf" ] && [ ! -f "./files/fonts/Arial-Bold.ttf" ]; then \
       mv ./files/fonts/arial-Bold.ttf ./files/fonts/Arial-Bold.ttf; \

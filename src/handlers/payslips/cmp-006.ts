@@ -151,7 +151,7 @@ export const generatePayslip6PDF = async (payslip: PayslipData, index: number, o
 
     const employerLines = [
         `Company: ${payslip.employer.name}`,
-        `Registration: ${payslip.employer.registrationNumber}`,
+
         `Email: ${payslip.employer.email}`,
         `Telephone: ${payslip.employer.phone}`,
         `Address: ${payslip.employer.address}`
@@ -277,7 +277,7 @@ export const generatePayslip6PDF = async (payslip: PayslipData, index: number, o
     page.drawText('CONFIDENTIAL', {
         x: width * 0.25,
         y: height * 0.2,
-        size: 60,
+        size: 50,
         font: fontBold,
         color: rgb(0.9, 0.9, 0.9),
         rotate: degrees(45)
