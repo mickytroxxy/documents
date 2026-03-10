@@ -417,23 +417,9 @@ export const generateFrontIdPdf = async (imagePath: string, outputPath: string) 
             <head>
                 <meta charset="UTF-8"/>
                 <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-                    body {
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 100vh;
-                        background: white;
-                    }
-                    img {
-                        max-width: 60%;
-                        max-height: 100vh;
-                        object-fit: contain;
-                    }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: white; }
+                    img { max-width: 60%; max-height: 100vh; object-fit: contain; }
                 </style>
             </head>
             <body>
@@ -442,54 +428,43 @@ export const generateFrontIdPdf = async (imagePath: string, outputPath: string) 
             </html>
         `;
 
-        // Launch puppeteer and create PDF
+        // Launch puppeteer with maximum stability settings for Docker
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-            protocolTimeout: 60000,
+            dumpio: true,
+            protocolTimeout: 90000,
+            ignoreDefaultArgs: ['--enable-automation'],
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-default-apps',
+                '--disable-software-rasterizer',
                 '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-default-apps',
                 '--disable-sync',
                 '--disable-translate',
                 '--metrics-recording-only',
                 '--mute-audio',
-                '--no-crash-upload',
-                '--no-pings',
-                '--hide-scrollbars',
-                '--dump-dom',
-                '--disable-font-subsetting',
+                '--no-first-run',
+                '--safebrowsing-disable-auto-update',
+                '--ignore-certificate-errors',
+                '--ignore-ssl-errors',
+                '--ignore-certificate-errors-spki-list',
+                '--user-data-dir=/tmp/chromium-data',
             ]
         });
-        const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(120000);
-        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
 
         await page.pdf({
             path: outputPath,
             format: 'A4',
             printBackground: true,
-            margin: {
-                top: '20mm',
-                bottom: '20mm',
-                left: '20mm',
-                right: '20mm'
-            }
+            margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' }
         });
 
         await browser.close();
@@ -520,23 +495,9 @@ export const generateBackIdPdf = async (imagePath: string, outputPath: string) =
             <head>
                 <meta charset="UTF-8"/>
                 <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-                    body {
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 100vh;
-                        background: white;
-                    }
-                    img {
-                        max-width: 60%;
-                        max-height: 100vh;
-                        object-fit: contain;
-                    }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: white; }
+                    img { max-width: 60%; max-height: 100vh; object-fit: contain; }
                 </style>
             </head>
             <body>
@@ -545,54 +506,43 @@ export const generateBackIdPdf = async (imagePath: string, outputPath: string) =
             </html>
         `;
 
-        // Launch puppeteer and create PDF
+        // Launch puppeteer with maximum stability settings for Docker
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-            protocolTimeout: 60000,
+            dumpio: true,
+            protocolTimeout: 90000,
+            ignoreDefaultArgs: ['--enable-automation'],
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-default-apps',
+                '--disable-software-rasterizer',
                 '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-default-apps',
                 '--disable-sync',
                 '--disable-translate',
                 '--metrics-recording-only',
                 '--mute-audio',
-                '--no-crash-upload',
-                '--no-pings',
-                '--hide-scrollbars',
-                '--dump-dom',
-                '--disable-font-subsetting',
+                '--no-first-run',
+                '--safebrowsing-disable-auto-update',
+                '--ignore-certificate-errors',
+                '--ignore-ssl-errors',
+                '--ignore-certificate-errors-spki-list',
+                '--user-data-dir=/tmp/chromium-data',
             ]
         });
-        const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(120000);
-        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
 
         await page.pdf({
             path: outputPath,
             format: 'A4',
             printBackground: true,
-            margin: {
-                top: '20mm',
-                bottom: '20mm',
-                left: '20mm',
-                right: '20mm'
-            }
+            margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' }
         });
 
         await browser.close();
@@ -611,8 +561,8 @@ export const generateBackIdPdf = async (imagePath: string, outputPath: string) =
 export const generateCombinedIdPdf = async (frontImagePath: string, backImagePath: string, outputPath: string) => {
     try {
         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-        const frontRotation = randomInRange(20, 45); // keep similar to original -75 but varied
-        const backRotation = randomInRange(20, 45); // keep similar to original 40 but varied
+        const frontRotation = randomInRange(20, 45);
+        const backRotation = randomInRange(20, 45);
 
         // Read both images and convert to black & white
         const frontBuffer = await sharp(frontImagePath).grayscale().png().toBuffer();
@@ -622,46 +572,20 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const frontBase64 = `data:image/png;base64,${frontBuffer.toString('base64')}`;
         const backBase64 = `data:image/png;base64,${backBuffer.toString('base64')}`;
 
-        // Create HTML with both images - front on top, back below with rotations
+        // Create HTML with both images
         const html = `
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="UTF-8"/>
                 <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-                    .container {
-                        display: flex;
-                        flex-direction: column;
-                        padding: 10mm;
-                        width: 100%;
-                        min-height: 100vh;
-                        background: white;
-                    }
-                    .id-container {
-                        margin: 10mm 0;
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .id-container h3 {
-                        margin-bottom: 8px;
-                        color: #333;
-                        font-family: Arial, sans-serif;
-                        font-size: 14px;
-                    }
-                    .id-container img {
-                        object-fit: contain;
-                    }
-                    .front {
-                        transform: rotate(${frontRotation}deg);
-                    }
-                    .back {
-                        transform: rotate(${backRotation}deg);
-                    }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    .container { display: flex; flex-direction: column; padding: 10mm; width: 100%; min-height: 100vh; background: white; }
+                    .id-container { margin: 10mm 0; display: flex; flex-direction: column; }
+                    .id-container h3 { margin-bottom: 8px; color: #333; font-family: Arial, sans-serif; font-size: 14px; }
+                    .id-container img { object-fit: contain; }
+                    .front { transform: rotate(${frontRotation}deg); }
+                    .back { transform: rotate(${backRotation}deg); }
                 </style>
             </head>
             <body>
@@ -677,54 +601,43 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
             </html>
         `;
 
-        // Launch puppeteer and create PDF
+        // Launch puppeteer with maximum stability settings for Docker
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-            protocolTimeout: 60000,
+            dumpio: true,
+            protocolTimeout: 90000,
+            ignoreDefaultArgs: ['--enable-automation'],
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-default-apps',
+                '--disable-software-rasterizer',
                 '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-default-apps',
                 '--disable-sync',
                 '--disable-translate',
                 '--metrics-recording-only',
                 '--mute-audio',
-                '--no-crash-upload',
-                '--no-pings',
-                '--hide-scrollbars',
-                '--dump-dom',
-                '--disable-font-subsetting',
+                '--no-first-run',
+                '--safebrowsing-disable-auto-update',
+                '--ignore-certificate-errors',
+                '--ignore-ssl-errors',
+                '--ignore-certificate-errors-spki-list',
+                '--user-data-dir=/tmp/chromium-data',
             ]
         });
-        const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(120000);
-        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
 
         await page.pdf({
             path: outputPath,
             format: 'A4',
             printBackground: true,
-            margin: {
-                top: '0mm',
-                bottom: '0mm',
-                left: '0mm',
-                right: '0mm'
-            }
+            margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' }
         });
 
         await browser.close();
