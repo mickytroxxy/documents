@@ -471,6 +471,8 @@ export const generateFrontIdPdf = async (imagePath: string, outputPath: string) 
         page.setDefaultNavigationTimeout(120000);
         page.setDefaultTimeout(120000);
 
+        await page.goto('about:blank');
+
         await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
         await page.pdf({

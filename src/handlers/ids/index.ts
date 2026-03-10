@@ -443,10 +443,18 @@ export const generateFrontIdPdf = async (imagePath: string, outputPath: string) 
         `;
 
         // Launch puppeteer and create PDF
-        const browser = await puppeteer.launch({ headless: true });
+        const browser = await puppeteer.launch({
+            headless: true,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
         const page = await browser.newPage();
+        page.setDefaultNavigationTimeout(120000);
+        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.goto('about:blank');
+
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
         await page.pdf({
             path: outputPath,
@@ -514,10 +522,18 @@ export const generateBackIdPdf = async (imagePath: string, outputPath: string) =
         `;
 
         // Launch puppeteer and create PDF
-        const browser = await puppeteer.launch({ headless: true });
+        const browser = await puppeteer.launch({
+            headless: true,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
         const page = await browser.newPage();
+        page.setDefaultNavigationTimeout(120000);
+        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.goto('about:blank');
+
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
         await page.pdf({
             path: outputPath,
@@ -614,10 +630,18 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         `;
 
         // Launch puppeteer and create PDF
-        const browser = await puppeteer.launch({ headless: true });
+        const browser = await puppeteer.launch({
+            headless: true,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
         const page = await browser.newPage();
+        page.setDefaultNavigationTimeout(120000);
+        page.setDefaultTimeout(120000);
 
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.goto('about:blank');
+
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
         await page.pdf({
             path: outputPath,
