@@ -506,15 +506,28 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
 
     const html = await generateNewHtml(data);
 
-    // Do not wait for network idle; our HTML is self-contained (data URLs + inline CSS)
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180000 });
-
-    await page.pdf({
-        path: output,
-        format: 'A4',
-        printBackground: true,
-        margin: { top: 0, bottom: 0, left: 0, right: 0 }
-    });
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180000 });
+            await page.waitForSelector('body', { timeout: 120000 });
+            await page.pdf({
+                path: output,
+                format: 'A4',
+                printBackground: true,
+                margin: { top: 0, bottom: 0, left: 0, right: 0 }
+            });
+            await browser.close();
+            return;
+        } catch (err: any) {
+            lastError = err;
+            if (attempt < maxAttempts) {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+        }
+    }
 
     await browser.close();
+    throw lastError || new Error('Failed to generate PDF after retries');
 };
