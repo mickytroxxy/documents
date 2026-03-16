@@ -478,7 +478,12 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        timeout: 120000,
+        protocolTimeout: 120000,
+    });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(120000);
     page.setDefaultTimeout(120000);
