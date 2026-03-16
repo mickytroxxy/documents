@@ -481,34 +481,31 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
     const browser = await puppeteer.launch({
         headless: true,
         protocolTimeout: 300000,
-        timeout: 0, // important for Cloud Run
         args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--single-process",
-            "--no-zygote"
+            "--disable-gpu"
         ]
-    });
+        });
 
-    const page = await browser.newPage();
+        const page = await browser.newPage();
 
-    page.setDefaultNavigationTimeout(0);
-    page.setDefaultTimeout(0);
+        page.setDefaultNavigationTimeout(0);
+        page.setDefaultTimeout(0);
 
-    const html = await generateNewHtml(data);
+        const html = await generateNewHtml(data);
 
-    await page.setContent(html, {
-    waitUntil: "domcontentloaded"
-    });
+        await page.setContent(html, {
+        waitUntil: "domcontentloaded"
+        });
 
-    await page.pdf({
+        await page.pdf({
         path: output,
         format: "A4",
         printBackground: true,
         margin: { top: 0, bottom: 0, left: 0, right: 0 }
-    });
+        });
 
-    await browser.close();
+        await browser.close();
 };

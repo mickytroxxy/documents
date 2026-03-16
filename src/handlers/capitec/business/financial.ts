@@ -354,22 +354,10 @@ export const generatePdf = async (
   outputPath: string
 ): Promise<void> => {
 
-  const browser = await puppeteer.launch({
-      headless: true,
-      protocolTimeout: 300000,
-      timeout: 0, // important for Cloud Run
-      args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--single-process",
-          "--no-zygote"
-      ]
-  });
-  const page = await browser.newPage();
-  page.setDefaultNavigationTimeout(0);
-  page.setDefaultTimeout(0);
+  const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(120000);
+    page.setDefaultTimeout(120000);
 
   // Avoid hanging on remote font/CDN requests (common cause of networkidle0 timeout)
   await page.setRequestInterception(true);
