@@ -478,36 +478,34 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-    page.setDefaultNavigationTimeout(120000);
-    page.setDefaultTimeout(120000);
+    const browser = await puppeteer.launch({
+        headless: true,
+        protocolTimeout: 300000,
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu"
+        ]
+        });
 
-    // Avoid hanging on remote font/CDN requests (common cause of networkidle0 timeout)
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-        const url = req.url();
-        if (url.startsWith('data:') || url.startsWith('file:') || url.startsWith('about:')) {
-            req.continue();
-            return;
-        }
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            req.abort();
-            return;
-        }
-        req.continue();
-    });
-    const html = await generateNewHtml(data);
+        const page = await browser.newPage();
 
-    // Do not wait for network idle; our HTML is self-contained (data URLs + inline CSS)
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
+        page.setDefaultNavigationTimeout(0);
+        page.setDefaultTimeout(0);
 
-    await page.pdf({
+        const html = await generateNewHtml(data);
+
+        await page.setContent(html, {
+        waitUntil: "domcontentloaded"
+        });
+
+        await page.pdf({
         path: output,
-        format: 'A4',
+        format: "A4",
         printBackground: true,
         margin: { top: 0, bottom: 0, left: 0, right: 0 }
-    });
+        });
 
-    await browser.close();
+        await browser.close();
 };
