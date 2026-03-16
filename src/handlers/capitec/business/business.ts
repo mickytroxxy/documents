@@ -480,21 +480,27 @@ export const generateNewHtml = async (data: BankStatement) => {
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
     const html = await generateNewHtml(data);
 
-    // Write HTML to a temp file so we can use page.goto('file://...') instead of
-    // page.setContent(). Passing a huge HTML string over the DevTools protocol for
-    // large (6+ month) statements causes Chromium to exhaust memory on Cloud Run
-    // and fail with "Timed out waiting for WS endpoint URL".
-    const tmpHtml = output.replace(/\.pdf$/, '_tmp.html');
+    // Write HTML to /tmp (always writable on Cloud Run) and load it via file://
+    // instead of passing the giant HTML string over the DevTools protocol.
+    // This avoids "Timed out waiting for WS endpoint URL" for large (6-month) docs.
+    const tmpHtml = path.join('/tmp', `business_stmt_${Date.now()}.html`);
     fs.writeFileSync(tmpHtml, html, 'utf8');
+
+    // Use the system Chromium set by PUPPETEER_EXECUTABLE_PATH env var in the
+    // Dockerfile (e.g. /usr/bin/chromium on Alpine). Without this, Puppeteer
+    // tries its own bundled binary which is absent when PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true.
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
     const browser = await puppeteer.launch({
         headless: true,
+        ...(executablePath ? { executablePath } : {}),
         protocolTimeout: 6000000,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--single-process',
         ],
     });
 
@@ -513,7 +519,6 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
         });
     } finally {
         await browser.close();
-        // Clean up the temporary HTML file
         try { fs.unlinkSync(tmpHtml); } catch (_) {}
     }
 };
