@@ -1,4 +1,4 @@
-import * as puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import { BankStatement } from './business_sample';
@@ -478,43 +478,36 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(120000);
+    page.setDefaultTimeout(120000);
+
+    // Avoid hanging on remote font/CDN requests (common cause of networkidle0 timeout)
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+        const url = req.url();
+        if (url.startsWith('data:') || url.startsWith('file:') || url.startsWith('about:')) {
+            req.continue();
+            return;
+        }
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            req.abort();
+            return;
+        }
+        req.continue();
+    });
     const html = await generateNewHtml(data);
 
-    const maxAttempts = 3;
-    let lastError: Error | null = null;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        let browser: puppeteer.Browser | null = null;
-        try {
-            browser = await puppeteer.launch({
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-                timeout: 180000,
-                defaultViewport: { width: 1200, height: 800 }
-            });
-            const page = await browser.newPage();
-            page.setDefaultNavigationTimeout(180000);
-            page.setDefaultTimeout(180000);
+    // Do not wait for network idle; our HTML is self-contained (data URLs + inline CSS)
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
-            // Use networkidle2 so it doesn't hang indefinitely if external fonts fail to load
-            await page.setContent(html, { waitUntil: 'networkidle2', timeout: 180000 });
-            await page.pdf({
-                path: output,
-                format: 'A4',
-                printBackground: true,
-                margin: { top: 0, bottom: 0, left: 0, right: 0 }
-            });
-            await browser.close();
-            return;
-        } catch (err: any) {
-            lastError = err;
-            if (browser) {
-                await browser.close();
-            }
-            if (attempt < maxAttempts) {
-                await new Promise((resolve) => setTimeout(resolve, 1500));
-            }
-        }
-    }
+    await page.pdf({
+        path: output,
+        format: 'A4',
+        printBackground: true,
+        margin: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
 
-    throw lastError || new Error('Failed to generate PDF after retries');
+    await browser.close();
 };
