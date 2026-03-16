@@ -489,14 +489,14 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
                 timeout: 180000,
-                defaultViewport: { width: 1200, height: 800 },
+                defaultViewport: { width: 1200, height: 800 }
             });
             const page = await browser.newPage();
             page.setDefaultNavigationTimeout(180000);
             page.setDefaultTimeout(180000);
 
-            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180000 });
-            await page.waitForSelector('body', { timeout: 120000 });
+            // Set content directly to avoid 'Requesting main frame too early' error
+            await page.setContent(html, { waitUntil: 'networkidle0', timeout: 180000 });
             await page.pdf({
                 path: output,
                 format: 'A4',
