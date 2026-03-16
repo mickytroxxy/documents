@@ -356,11 +356,12 @@ export const generatePdf = async (
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
   const page = await browser.newPage();
-
+  page.setDefaultNavigationTimeout(120000);
+  page.setDefaultTimeout(120000);
   await page.setContent(html, {
     waitUntil: "networkidle0"
   });
