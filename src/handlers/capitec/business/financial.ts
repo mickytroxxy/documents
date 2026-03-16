@@ -354,14 +354,26 @@ export const generatePdf = async (
   outputPath: string
 ): Promise<void> => {
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(120000);
+    page.setDefaultTimeout(120000);
+
+  // Avoid hanging on remote font/CDN requests (common cause of networkidle0 timeout)
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+      const url = req.url();
+      if (url.startsWith('data:') || url.startsWith('file:') || url.startsWith('about:')) {
+          req.continue();
+          return;
+      }
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+          req.abort();
+          return;
+      }
+      req.continue();
   });
 
-  const page = await browser.newPage();
-  page.setDefaultNavigationTimeout(120000);
-  page.setDefaultTimeout(120000);
   await page.setContent(html, {
     waitUntil: "networkidle0"
   });
