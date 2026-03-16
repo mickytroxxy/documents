@@ -480,7 +480,7 @@ export const generateNewHtml = async (data: BankStatement) => {
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
     const browser = await puppeteer.launch({
         headless: true,
-        protocolTimeout: 300000,
+        protocolTimeout: 6000000,
         args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
