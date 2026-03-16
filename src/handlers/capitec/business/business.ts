@@ -487,7 +487,7 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
         try {
             browser = await puppeteer.launch({
                 headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
                 timeout: 180000,
                 defaultViewport: { width: 1200, height: 800 }
             });
