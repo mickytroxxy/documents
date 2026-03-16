@@ -478,34 +478,42 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
+    const html = await generateNewHtml(data);
+
+    // Write HTML to a temp file so we can use page.goto('file://...') instead of
+    // page.setContent(). Passing a huge HTML string over the DevTools protocol for
+    // large (6+ month) statements causes Chromium to exhaust memory on Cloud Run
+    // and fail with "Timed out waiting for WS endpoint URL".
+    const tmpHtml = output.replace(/\.pdf$/, '_tmp.html');
+    fs.writeFileSync(tmpHtml, html, 'utf8');
+
     const browser = await puppeteer.launch({
         headless: true,
         protocolTimeout: 6000000,
         args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu"
-        ]
-        });
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+        ],
+    });
 
+    try {
         const page = await browser.newPage();
-
         page.setDefaultNavigationTimeout(0);
         page.setDefaultTimeout(0);
 
-        const html = await generateNewHtml(data);
-
-        await page.setContent(html, {
-        waitUntil: "domcontentloaded"
-        });
+        await page.goto(`file://${tmpHtml}`, { waitUntil: 'domcontentloaded' });
 
         await page.pdf({
-        path: output,
-        format: "A4",
-        printBackground: true,
-        margin: { top: 0, bottom: 0, left: 0, right: 0 }
+            path: output,
+            format: 'A4',
+            printBackground: true,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
         });
-
+    } finally {
         await browser.close();
+        // Clean up the temporary HTML file
+        try { fs.unlinkSync(tmpHtml); } catch (_) {}
+    }
 };
