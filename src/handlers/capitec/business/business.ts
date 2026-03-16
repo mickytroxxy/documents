@@ -478,12 +478,18 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
-    const browser = await puppeteer.launch({ headless: true });
+    // Launch with Cloud Run-friendly flags and higher launch/connect timeout
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+        timeout: 180000,
+        defaultViewport: { width: 1200, height: 800 },
+    });
     const page = await browser.newPage();
-    page.setDefaultNavigationTimeout(120000);
-    page.setDefaultTimeout(120000);
+    page.setDefaultNavigationTimeout(180000);
+    page.setDefaultTimeout(180000);
 
-    // Avoid hanging on remote font/CDN requests (common cause of networkidle0 timeout)
+    // Avoid hanging on remote font/CDN requests (common cause of network idle issues)
     await page.setRequestInterception(true);
     page.on('request', (req) => {
         const url = req.url();
@@ -497,10 +503,11 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
         }
         req.continue();
     });
+
     const html = await generateNewHtml(data);
 
     // Do not wait for network idle; our HTML is self-contained (data URLs + inline CSS)
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180000 });
 
     await page.pdf({
         path: output,
