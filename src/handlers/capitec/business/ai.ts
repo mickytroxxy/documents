@@ -32,7 +32,7 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const clampMonths = (m: any) => {
     const n = Number(m);
     if (!Number.isFinite(n)) return 1;
-    return Math.min(12, Math.max(1, Math.floor(n)));
+    return Math.min(24, Math.max(1, Math.floor(n)));
 };
 
 const isoDateOnly = (d: Date) => d.toISOString().slice(0, 10);

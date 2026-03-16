@@ -18,6 +18,7 @@ import { createBusinessBankStatementHandler } from './handlers/capitec/business/
 import { CapitecBankStatement } from './handlers/capitec/business/business_sample';
 import { generateIdImage } from './handlers/ids';
 import { psdEditorHandler } from './handlers/ids/psdEditor';
+import { generateFinancialStatementFromPdf } from './handlers/capitec/business/financial';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -29,7 +30,8 @@ app.use(bodyParser.json());
 
 export let secrets = {
     BASE_URL:`https://documents-621707723909.europe-west1.run.app/api`,
-    DEEP_SEEK_API: process.env.DEEP_SEEK_API || 'sk-aee53cdb70a04ea7baa613ddc897ade0'
+    DEEP_SEEK_API: process.env.DEEP_SEEK_API || 'sk-aee53cdb70a04ea7baa613ddc897ade0',
+    GEMINI_API: process.env.GEMINI_API || ''
 };
 
 export const Main = () => {
@@ -95,6 +97,10 @@ export const Main = () => {
         //     documentId: '116555883'
         // };
         // psdEditorHandler(testIdInfo);
+        
+        // Note: generateFinancialStatementFromPdf is now called from the API endpoint
+        // when generating business bank statements with financials: { required: true }
+        //generateFinancialStatementFromPdf(path.join(__dirname, '.','input.pdf'), '1234567890', 'Empire Digitals', 'Lameck Ndhlovu')
     });
 };
 

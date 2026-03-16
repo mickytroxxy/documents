@@ -3,9 +3,10 @@ import fs from 'fs';
 import { mkdirp } from 'mkdirp';
 import { Request, Response } from 'express';
 import { secrets } from '../../../server';
-import { BankStatement } from './business_sample';
+import { BankStatement, Transaction } from './business_sample';
 import { generateBusinessCapitecStatementsAI } from './ai';
 import { createBusinessBankStatementHandler } from './business';
+import { generateFinancialStatementFromPdf } from './financial';
 
 export type GenerateBusinessBankStatementRequest = {
     bankName: string;
@@ -20,6 +21,85 @@ export type GenerateBusinessBankStatementRequest = {
     targetFinalClosingBalance?: number;
     address: BankStatement['address'];
     bankDetails: BankStatement['bankDetails'];
+    // Financial statement generation fields
+
+    financials?: {
+        required: boolean;
+        startDate: string;
+        endDate: string;
+        directorName?: string;
+        accountingCompanyName?: string;
+    };
+};
+
+// Helper function to merge multiple bank statements into one
+const mergeBankStatements = (statements: BankStatement[]): BankStatement => {
+    if (statements.length === 0) {
+        throw new Error('No statements to merge');
+    }
+
+    if (statements.length === 1) {
+        return statements[0];
+    }
+
+    // Collect all transactions from all statements
+    let allTransactions: Transaction[] = [];
+    for (const stmt of statements) {
+        allTransactions = allTransactions.concat(stmt.transactions);
+    }
+
+    // Sort transactions by postDate
+    allTransactions.sort((a, b) => {
+        const dateA = new Date(a.postDate).getTime();
+        const dateB = new Date(b.postDate).getTime();
+        return dateA - dateB;
+    });
+
+    // Recalculate balances after sorting
+    let runningBalance = allTransactions[0].balanceAfter - allTransactions[0].amount;
+    for (const tx of allTransactions) {
+        tx.balanceAfter = runningBalance + tx.amount;
+        runningBalance = tx.balanceAfter;
+    }
+
+    // Get the first statement's account info as base
+    const firstStmt = statements[0];
+    const lastStmt = statements[statements.length - 1];
+
+    // Calculate total fees
+    let totalFee = 0;
+    let totalVat = 0;
+    for (const stmt of statements) {
+        if (stmt.fees) {
+            totalFee += Math.abs(stmt.fees.feeTotal || 0);
+            totalVat += Math.abs(stmt.fees.vatTotal || 0);
+        }
+    }
+
+    // Create merged statement
+    const mergedStatement: BankStatement = {
+        account: {
+            ...firstStmt.account,
+            statementDate: lastStmt.account.statementDate,
+            statementNumber: '00001',
+            page: 1,
+            totalPages: 1
+        },
+        balances: {
+            openingBalance: firstStmt.balances.openingBalance,
+            closingBalance: lastStmt.balances.closingBalance
+        },
+        address: firstStmt.address,
+        bankDetails: firstStmt.bankDetails,
+        fees: {
+            feeTotal: -totalFee,
+            vatTotal: -totalVat,
+            vatRate: '15.00%'
+        },
+        transactions: allTransactions
+    };
+
+    return mergedStatement;
 };
 
 export const generate_business_bank_statement = async (req: Request, res: Response) => {
@@ -36,7 +116,8 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
             openingBalance,
             targetFinalClosingBalance,
             address,
-            bankDetails
+            bankDetails,
+            financials,
         } = (req.body || {}) as GenerateBusinessBankStatementRequest;
 
         if (!bankName || !accountNumber || !accountType || !businessName) {
@@ -66,9 +147,28 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
             return res.status(400).json({ status: 0, message: 'Only CAPITEC business statements are supported for now' });
         }
 
+        let monthsToGenerate = Number(months);
+        
+        if (financials?.required) {
+            const start = new Date(financials.startDate);
+            const end = financials.endDate ? new Date(financials.endDate) : new Date();
+            
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                return res.status(400).json({ status: 0, message: 'Invalid financials startDate or endDate' });
+            }
+            
+            // Calculate months between start and end for the long statement
+            const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+            monthsToGenerate = diffMonths > 0 ? diffMonths : 1;
+            
+            console.log(`Financials required: Generating ${monthsToGenerate} months from ${financials.startDate} to ${financials.endDate || end.toISOString().slice(0, 10)}`);
+        }
+
+        console.log(`Generating ${monthsToGenerate} month(s) of statements for ${normalizedBankName} business account ${accountNumber}`);
+        
         const { statements } = await generateBusinessCapitecStatementsAI({
             bankName: normalizedBankName,
-            months: Number(months),
+            months: monthsToGenerate,
             accountNumber: String(accountNumber),
             accountType: String(accountType),
             businessName: String(businessName),
@@ -89,6 +189,7 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
         const urls: string[] = [];
         const baseUrl = secrets?.BASE_URL;
 
+        // Always create the monthly statements (based on months input
         for (let i = 0; i < statements.length; i++) {
             const stmt = statements[i];
             const filename = `Account Statement_${stmt.account.statementNumber}_${stmt.account.statementDate}.pdf`;
@@ -96,9 +197,44 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
 
             await createBusinessBankStatementHandler(outPath, stmt);
 
-            // Ensure file exists
             if (fs.existsSync(outPath)) {
                 urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
+            }
+        }
+
+        // If financials.required is true, also create the long merged statement for Gemini
+        if (financials?.required) {
+            const mergedStatement = mergeBankStatements(statements);
+            
+            const startDateStr = financials.startDate;
+            const endDateStr = financials.endDate || new Date().toISOString().slice(0, 10);
+            const filename = `Financial Reference_${startDateStr}_to_${endDateStr}.pdf`;
+            const outPath = path.join(folder, filename);
+
+            await createBusinessBankStatementHandler(outPath, mergedStatement);
+
+            if (fs.existsSync(outPath)) {
+                urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
+            }
+            
+            console.log(`Created long merged statement for financials: ${filename}`);
+            
+            // Generate comprehensive financial statement using Gemini
+            try {
+                // Generate financial statement from the merged PDF
+                const financialResultPath = await generateFinancialStatementFromPdf(outPath,accountNumber, financials.accountingCompanyName, financials.directorName);
+                
+                if (fs.existsSync(financialResultPath)) {
+                    const financialFilename = path.basename(financialResultPath);
+                    // Copy to the business folder for easier access
+                    const financialDestPath = path.join(folder, financialFilename);
+                    fs.copyFileSync(financialResultPath, financialDestPath);
+                    urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${financialFilename}`);
+                    console.log(`Created comprehensive financial statement: ${financialFilename}`);
+                }
+            } catch (financialError) {
+                console.error('Error generating financial statement:', financialError);
+                // Don't fail the whole request if financial generation fails
             }
         }
 
