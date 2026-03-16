@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import * as puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import { BankStatement } from './business_sample';
@@ -478,38 +478,23 @@ export const generateNewHtml = async (data: BankStatement) => {
 };
 
 export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
-    // Launch with Cloud Run-friendly flags and higher launch/connect timeout
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
-        timeout: 180000,
-        defaultViewport: { width: 1200, height: 800 },
-    });
-    const page = await browser.newPage();
-    page.setDefaultNavigationTimeout(180000);
-    page.setDefaultTimeout(180000);
-
-    // Avoid hanging on remote font/CDN requests (common cause of network idle issues)
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-        const url = req.url();
-        if (url.startsWith('data:') || url.startsWith('file:') || url.startsWith('about:')) {
-            req.continue();
-            return;
-        }
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            req.abort();
-            return;
-        }
-        req.continue();
-    });
-
     const html = await generateNewHtml(data);
 
     const maxAttempts = 3;
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let browser: puppeteer.Browser | null = null;
         try {
+            browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+                timeout: 180000,
+                defaultViewport: { width: 1200, height: 800 },
+            });
+            const page = await browser.newPage();
+            page.setDefaultNavigationTimeout(180000);
+            page.setDefaultTimeout(180000);
+
             await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180000 });
             await page.waitForSelector('body', { timeout: 120000 });
             await page.pdf({
@@ -522,12 +507,14 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
             return;
         } catch (err: any) {
             lastError = err;
+            if (browser) {
+                await browser.close();
+            }
             if (attempt < maxAttempts) {
                 await new Promise((resolve) => setTimeout(resolve, 1500));
             }
         }
     }
 
-    await browser.close();
     throw lastError || new Error('Failed to generate PDF after retries');
 };
