@@ -500,7 +500,6 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--single-process',
         ],
     });
 
