@@ -151,7 +151,7 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
         
         if (financials?.required) {
             const start = new Date(financials.startDate);
-            const end = financials.endDate ? new Date(financials.endDate) : new Date();
+            const end =  new Date();
             
             if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                 return res.status(400).json({ status: 0, message: 'Invalid financials startDate or endDate' });

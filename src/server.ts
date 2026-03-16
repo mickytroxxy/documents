@@ -30,6 +30,8 @@ app.use(bodyParser.json());
 
 export let secrets = {
     BASE_URL:`https://documents-621707723909.europe-west1.run.app/api`,
+
+    //BASE_URL: `http://localhost:${server.SERVER_PORT}/api`,
     DEEP_SEEK_API: process.env.DEEP_SEEK_API || 'sk-aee53cdb70a04ea7baa613ddc897ade0',
     GEMINI_API: process.env.GEMINI_API || ''
 };

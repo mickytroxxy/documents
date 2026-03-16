@@ -354,7 +354,6 @@ const sanitizePlaceholders = (transactions: any[]) => {
         const reference = sanitizeText(t?.reference);
 
         const company = companies[idx % companies.length];
-        const payroll = payrollProviders[idx % payrollProviders.length];
 
         const nextDesc = looksPlaceholder(description) ? `EFT ${company}` : description;
         const nextRef = looksPlaceholder(reference) ? `INV-${String(100000 + idx)}` : reference;
@@ -388,54 +387,7 @@ const enforceScheduledTransactions = (p: {
     salaryDay: number;
     rentalDay: number;
 }) => {
-    const salaryISO = clampToPeriodISO(makeDayOfMonthISO(p.toISO, p.salaryDay), p.fromISO, p.toISO);
-    const rentalISO = clampToPeriodISO(makeDayOfMonthISO(p.toISO, p.rentalDay), p.fromISO, p.toISO);
-
-    // If statement period ends before scheduled day (partial current month), do not inject future-dated items.
-    const salaryIsInRange = salaryISO <= p.toISO;
-    const rentIsInRange = rentalISO <= p.toISO;
-
-    const hasSalary = p.transactions.some((t) => {
-        const d = String(t?.postDate || '');
-        const desc = String(t?.description || '').toLowerCase();
-        const amt = toNumber(t?.amount);
-        return d.slice(0, 10) === salaryISO && (desc.includes('salary') || desc.includes('payroll')) && amt < 0;
-    });
-
-    const hasRent = p.transactions.some((t) => {
-        const d = String(t?.postDate || '');
-        const desc = String(t?.description || '').toLowerCase();
-        return d.slice(0, 10) === rentalISO && (desc.includes('rent') || desc.includes('rental')) && toNumber(t?.amount) < 0;
-    });
-
     const out = [...p.transactions];
-    if (salaryIsInRange && !hasSalary) {
-        out.push({
-            postDate: salaryISO,
-            transactionDate: salaryISO,
-            description: 'Payroll Payment - Sage Payroll',
-            reference: 'SAGE PAYROLL',
-            authId: '',
-            // Payroll is money out for a business account.
-            amount: -85000,
-            fees: undefined,
-            type: 'debit'
-        });
-    }
-
-    if (rentIsInRange && !hasRent) {
-        out.push({
-            postDate: rentalISO,
-            transactionDate: rentalISO,
-            description: 'Monthly Rental Payment',
-            reference: 'RENT',
-            authId: '',
-            amount: -25000,
-            fees: -3.5,
-            type: 'debit'
-        });
-    }
-
     return out;
 };
 

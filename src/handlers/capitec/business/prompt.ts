@@ -77,6 +77,15 @@ Return ONLY valid JSON (no markdown, no commentary) that matches this schema exa
 
 Important rules:
 - Statement period: fromISO=${p.statementPeriod.fromISO} toISO=${p.statementPeriod.toISO}
+- NO NEGATIVE BALANCES: the running balance must never go below zero at any point in the statement.
+- Amounts must be realistic with decimal cents (e.g., 1234.56). Do not use whole numbers always like 10000, 100000, 50000 or unrealistic decimals.
+- Salary and rent scheduling (these inputs never change across months):
+  - Salary date: day ${p.salaryDay} of the month. This is a PAYROLL payout, so it MUST be a DEBIT (money out) on that exact day.
+  - Rental date: day ${p.rentalDay} of the month. This MUST be a DEBIT (money out) on that exact day.
+- Month-end fees:
+  - On the last day of the month (toISO), include bank charges for (THIS IS A MUST):
+    - Monthly Service Fee -> THIS HAS NO DESCRIPTION
+    - Notification Fee -> THIS HAS NO DESCRIPTION
 - Opening balance MUST be exactly: ${p.openingBalance}
 - Closing balance should be realistic. ${p.targetClosingBalance !== undefined ? `The final closing balance MUST be exactly ${p.targetClosingBalance}.` : 'Do not force a specific closing balance unless it naturally fits.'}
 - Do NOT allow the account to go into overdraft: the running balance must never be negative at any point in the transactions.
@@ -88,7 +97,7 @@ Important rules:
   - Avoid weekends and avoid common South African public holidays as transaction dates.
 - Descriptions and references MUST be realistic:
   - DO NOT use placeholders like "Client A", "Client B", "Company A", "Test", "Placeholder".
-  - Use real-looking company/provider names (e.g., Bidvest, MTN, Vodacom, Takealot, Shoprite, Pick n Pay, SARS, Eskom, DHL etc.).
+  - Use real-looking company/provider names (e.g., Mr Price, Real Estate names, industrial names, Takealot, Shoprite, Pick n Pay, DSTV, Eskom, DHL etc.).
   - References must look real (invoice numbers, EFT refs, merchant names) and not generic single letters.
 - Salary and rent scheduling (these inputs never change across months):
   - Salary date: day ${p.salaryDay} of the month. This is a PAYROLL payout, so it MUST be a DEBIT (money out) on that exact day.
