@@ -495,8 +495,8 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
             page.setDefaultNavigationTimeout(180000);
             page.setDefaultTimeout(180000);
 
-            // Set content directly to avoid 'Requesting main frame too early' error
-            await page.setContent(html, { waitUntil: 'networkidle0', timeout: 180000 });
+            // Use networkidle2 so it doesn't hang indefinitely if external fonts fail to load
+            await page.setContent(html, { waitUntil: 'networkidle2', timeout: 180000 });
             await page.pdf({
                 path: output,
                 format: 'A4',
