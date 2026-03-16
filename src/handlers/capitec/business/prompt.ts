@@ -8,7 +8,9 @@ export type BusinessCapitecPromptParams = {
     businessName: string;
     comment?: string;
     salaryDay: number;
+    salaryAmount: number;
     rentalDay: number;
+    rentalAmount: number;
     statementNumberStart?: number;
     statementPeriod: { fromISO: string; toISO: string };
     openingBalance: number;
@@ -81,7 +83,9 @@ Important rules:
 - Amounts must be realistic with decimal cents (e.g., 1234.56). Do not use whole numbers always like 10000, 100000, 50000 or unrealistic decimals.
 - Salary and rent scheduling (these inputs never change across months):
   - Salary date: day ${p.salaryDay} of the month. This is a PAYROLL payout, so it MUST be a DEBIT (money out) on that exact day.
+    - Salary amount: R${p.salaryAmount.toFixed(2)} (use this exact amount)
   - Rental date: day ${p.rentalDay} of the month. This MUST be a DEBIT (money out) on that exact day.
+    - Rental amount: R${p.rentalAmount.toFixed(2)} (use this exact amount)
 - Month-end fees:
   - On the last day of the month (toISO), include bank charges for (THIS IS A MUST):
     - Monthly Service Fee -> THIS HAS NO DESCRIPTION
@@ -101,7 +105,9 @@ Important rules:
   - References must look real (invoice numbers, EFT refs, merchant names) and not generic single letters.
 - Salary and rent scheduling (these inputs never change across months):
   - Salary date: day ${p.salaryDay} of the month. This is a PAYROLL payout, so it MUST be a DEBIT (money out) on that exact day.
+    - Salary amount: R${p.salaryAmount.toFixed(2)} (use this exact amount)
   - Rental date: day ${p.rentalDay} of the month. This MUST be a DEBIT (money out) on that exact day.
+    - Rental amount: R${p.rentalAmount.toFixed(2)} (use this exact amount)
 - Month-end fees:
   - On the last day of the month (toISO), include bank charges for (THIS IS A MUST):
     - Monthly Service Fee -> THIS HAS NO DESCRIPTION

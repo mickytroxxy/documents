@@ -16,7 +16,9 @@ export type GenerateBusinessBankStatementRequest = {
     businessName: string;
     comment?: string;
     salaryDay: number;
+    salaryAmount: number;
     rentalDay: number;
+    rentalAmount: number;
     openingBalance: number;
     targetFinalClosingBalance?: number;
     address: BankStatement['address'];
@@ -112,7 +114,9 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
             businessName,
             comment,
             salaryDay,
+            salaryAmount,
             rentalDay,
+            rentalAmount,
             openingBalance,
             targetFinalClosingBalance,
             address,
@@ -135,11 +139,20 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
 
         const salary = Number(salaryDay);
         const rental = Number(rentalDay);
+        const salaryAmountNum = Number(salaryAmount);
+        const rentalAmountNum = Number(rentalAmount);
+
         if (!Number.isFinite(salary) || salary < 1 || salary > 31) {
             return res.status(400).json({ status: 0, message: 'salaryDay must be a number between 1 and 31' });
         }
         if (!Number.isFinite(rental) || rental < 1 || rental > 31) {
             return res.status(400).json({ status: 0, message: 'rentalDay must be a number between 1 and 31' });
+        }
+        if (!Number.isFinite(salaryAmountNum) || salaryAmountNum <= 0) {
+            return res.status(400).json({ status: 0, message: 'salaryAmount must be a positive number' });
+        }
+        if (!Number.isFinite(rentalAmountNum) || rentalAmountNum <= 0) {
+            return res.status(400).json({ status: 0, message: 'rentalAmount must be a positive number' });
         }
 
         const normalizedBankName = String(bankName).toUpperCase();
@@ -174,7 +187,9 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
             businessName: String(businessName),
             comment: comment ? String(comment) : undefined,
             salaryDay: salary,
+            salaryAmount: salaryAmountNum,
             rentalDay: rental,
+            rentalAmount: rentalAmountNum,
             openingBalance: opening,
             address,
             bankDetails,

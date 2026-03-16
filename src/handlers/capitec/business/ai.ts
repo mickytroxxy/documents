@@ -12,7 +12,9 @@ export type GenerateBusinessCapitecInput = {
     businessName: string;
     comment?: string;
     salaryDay: number;
+    salaryAmount: number;
     rentalDay: number;
+    rentalAmount: number;
     openingBalance: number;
     availableBalance?: number;
     address: BankStatement['address'];
@@ -42,69 +44,7 @@ const parseISODate = (iso: string) => {
     return Number.isNaN(d.getTime()) ? null : d;
 };
 
-const isWeekend = (d: Date) => {
-    const day = d.getDay();
-    return day === 0 || day === 6;
-};
 
-// Light-weight SA holiday approximation (fixed-date holidays only) to reduce obviously fake patterns.
-// We deliberately do not implement complex "observed" logic; we just nudge off these dates.
-const isCommonSAHoliday = (d: Date) => {
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const key = `${m}-${day}`;
-    const fixed = new Set([
-        '1-1', // New Year's Day
-        '3-21', // Human Rights Day
-        '4-27', // Freedom Day
-        '5-1', // Workers' Day
-        '6-16', // Youth Day
-        '8-9', // National Women's Day
-        '9-24', // Heritage Day
-        '12-16', // Day of Reconciliation
-        '12-25', // Christmas Day
-        '12-26' // Day of Goodwill
-    ]);
-    return fixed.has(key);
-};
-
-const nextBusinessDayISO = (iso: string, maxSteps = 10) => {
-    const d = parseISODate(iso);
-    if (!d) return iso;
-    let steps = 0;
-    while ((isWeekend(d) || isCommonSAHoliday(d)) && steps < maxSteps) {
-        d.setDate(d.getDate() + 1);
-        steps++;
-    }
-    return isoDateOnly(d);
-};
-
-const clampToPeriodISO = (iso: string, fromISO: string, toISO: string) => {
-    const d = parseISODate(iso);
-    const from = parseISODate(fromISO);
-    const to = parseISODate(toISO);
-    if (!d || !from || !to) return iso;
-    if (d < from) return fromISO;
-    if (d > to) return toISO;
-    return isoDateOnly(d);
-};
-
-const makeDayOfMonthISO = (periodToISO: string, dayOfMonth: number) => {
-    const end = parseISODate(periodToISO);
-    if (!end) return periodToISO;
-    const y = end.getFullYear();
-    const m = end.getMonth();
-    const maxDay = new Date(y, m + 1, 0).getDate();
-    const day = Math.min(Math.max(1, Math.floor(dayOfMonth)), maxDay);
-    return isoDateOnly(new Date(y, m, day));
-};
-
-const isMonthEndISO = (toISO: string) => {
-    const d = parseISODate(toISO);
-    if (!d) return false;
-    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return isoDateOnly(last) === isoDateOnly(d);
-};
 
 const buildPeriods = (months: number) => {
     const now = new Date();
@@ -132,286 +72,6 @@ const buildPeriods = (months: number) => {
     return periods;
 };
 
-const normalizeStatement = (stmt: any, openingBalance: number): BankStatement => {
-    const rawTransactions = Array.isArray(stmt?.transactions) ? stmt.transactions : [];
-
-    // Sorting prevents "scattered" looking dates and ensures balances are computed in time order.
-    const sortedTransactions = [...rawTransactions].sort((a: any, b: any) => {
-        const aPost = String(a?.postDate || '');
-        const bPost = String(b?.postDate || '');
-        if (aPost !== bPost) return aPost.localeCompare(bPost);
-        const aTxn = String(a?.transactionDate || aPost);
-        const bTxn = String(b?.transactionDate || bPost);
-        if (aTxn !== bTxn) return aTxn.localeCompare(bTxn);
-        return toNumber(a?.amount) - toNumber(b?.amount);
-    });
-
-    let balance = round2(openingBalance);
-    const transactions: BankStatement['transactions'] = sortedTransactions.map((t: any) => {
-        let amount = round2(toNumber(t?.amount));
-        const fees = t?.fees === undefined ? undefined : round2(toNumber(t?.fees));
-
-        const ref = String(t?.reference || '').toUpperCase();
-        const isMandatory =
-            ref.includes('SAGE PAYROLL') ||
-            ref === 'RENT' ||
-            ref === 'MONTHLY SERVICE FEE' ||
-            ref === 'NOTIFICATION FEE';
-
-        // Safety: never allow negative balance. If a non-mandatory debit would overdraw,
-        // clamp its amount so the resulting balance is slightly above zero.
-        if (!isMandatory && amount < 0) {
-            const projected = round2(balance + amount + (fees ?? 0));
-            if (projected < 0) {
-                const targetMin = 50; // keep a small positive buffer
-                const maxDebit = round2(balance + (fees ?? 0) - targetMin);
-                amount = round2(-Math.max(0, maxDebit));
-            }
-        }
-
-        balance = round2(balance + amount + (fees ?? 0));
-
-        const type = amount >= 0 ? 'credit' : 'debit';
-
-        return {
-            postDate: String(t?.postDate || ''),
-            transactionDate: String(t?.transactionDate || t?.postDate || ''),
-            description: String(t?.description || ''),
-            reference: t?.reference ? String(t.reference) : undefined,
-            authId: t?.authId ? String(t.authId) : undefined,
-            amount,
-            fees,
-            balanceAfter: balance,
-            type
-        };
-    });
-
-    const feeTotalValue = round2(transactions.reduce((s, t) => s + (t.fees || 0), 0));
-    const vatTotalValue = round2(feeTotalValue * 0.15);
-
-    const account = {
-        accountNumber: String(stmt?.account?.accountNumber || ''),
-        accountType: String(stmt?.account?.accountType || ''),
-        businessName: String(stmt?.account?.businessName || ''),
-        statementDate: String(stmt?.account?.statementDate || ''),
-        statementNumber: String(stmt?.account?.statementNumber || ''),
-        page: 1,
-        totalPages: 1
-    };
-
-    return {
-        account,
-        balances: {
-            openingBalance: round2(openingBalance),
-            closingBalance: round2(balance)
-        },
-        address: stmt?.address || {},
-        bankDetails: stmt?.bankDetails || {},
-        fees: {
-            feeTotal: feeTotalValue,
-            vatTotal: vatTotalValue,
-            vatRate: String(stmt?.fees?.vatRate || '15.00%')
-        },
-        transactions
-    };
-};
-
-const enforceMonthEndFees = (
-    transactions: any[],
-    toISO: string
-): any[] => {
-    const postingDate = toISO;
-    // Match business_sample.ts: description is empty and fee type is in `reference`, amount is negative.
-    const required = [
-        { reference: 'Monthly Service Fee', amount: -100.0 },
-        { reference: 'Notification Fee', amount: -7.0 }
-    ];
-
-    const feeRefs = new Set(required.map((r) => r.reference.toLowerCase().trim()));
-
-    // If this period is NOT month-end (e.g. current month up to today), fees must not appear mid-month.
-    if (!isMonthEndISO(toISO)) {
-        return (Array.isArray(transactions) ? transactions : []).filter((t) => {
-            const ref = String(t?.reference || '').toLowerCase().trim();
-            return !feeRefs.has(ref);
-        });
-    }
-
-    // Normalize any AI-provided fee rows: force onto month-end and blank description.
-    const refined = (Array.isArray(transactions) ? transactions : []).map((t) => {
-        const ref = String(t?.reference || '').toLowerCase().trim();
-        if (!feeRefs.has(ref)) return t;
-
-        const amt = toNumber(t?.amount);
-        return {
-            ...t,
-            postDate: postingDate,
-            transactionDate: postingDate,
-            description: '',
-            amount: amt <= 0 ? amt : -Math.abs(amt),
-            fees: undefined,
-            type: 'debit'
-        };
-    });
-
-    const hasFeeRef = (ref: string) =>
-        refined.some((t) => String(t?.reference || '').toLowerCase().trim() === ref.toLowerCase().trim());
-
-    const out = [...refined];
-    for (const f of required) {
-        if (!hasFeeRef(f.reference)) {
-            out.push({
-                postDate: postingDate,
-                transactionDate: postingDate,
-                reference: f.reference,
-                authId: '',
-                description: '',
-                amount: f.amount,
-                fees: undefined,
-                type: 'debit'
-            });
-        }
-    }
-
-    // Deduplicate by reference so each fee appears once.
-    const seen = new Set<string>();
-    const deduped: any[] = [];
-    for (let i = out.length - 1; i >= 0; i--) {
-        const t = out[i];
-        const ref = String(t?.reference || '').toLowerCase().trim();
-        if (feeRefs.has(ref)) {
-            if (seen.has(ref)) continue;
-            seen.add(ref);
-        }
-        deduped.push(t);
-    }
-
-    return deduped.reverse();
-};
-
-const cleanReferenceNotDescription = (transactions: any[]) => {
-    return (Array.isArray(transactions) ? transactions : []).map((t, idx) => {
-        const description = sanitizeText(t?.description);
-        const reference = sanitizeText(t?.reference);
-
-        const refLower = reference.toLowerCase().trim();
-        const isFeeRef = refLower === 'monthly service fee' || refLower === 'notification fee';
-        if (isFeeRef) {
-            return { ...t, description: '', reference };
-        }
-
-        if (!reference || reference.toLowerCase().trim() === description.toLowerCase().trim()) {
-            return { ...t, reference: `INV-${String(300000 + idx)}` };
-        }
-
-        return t;
-    });
-};
-
-const sanitizeText = (v: any) => {
-    const s = String(v || '').trim();
-    return s;
-};
-
-const sanitizePlaceholders = (transactions: any[]) => {
-    const companies = [
-        'Bidvest',
-        'MTN',
-        'Vodacom',
-        'Takealot',
-        'Shoprite',
-        'Pick n Pay',
-        'Sasol',
-        'Woolworths',
-        'Dis-Chem',
-        'Clicks',
-        'SARS',
-        'Eskom',
-        'City Power',
-        'DHL',
-        'FedEx'
-    ];
-
-    const payrollProviders = ['Sage Payroll', 'PaySpace', 'SimplePay', 'SARS EMP201'];
-
-    const looksPlaceholder = (s: string) => {
-        const x = s.toLowerCase();
-        if (!x) return true;
-        return (
-            x.includes('client a') ||
-            x.includes('client b') ||
-            x.includes('client c') ||
-            x.includes('company a') ||
-            x.includes('company b') ||
-            x.includes('company c') ||
-            x.includes('test') ||
-            x.includes('placeholder')
-        );
-    };
-
-    return transactions.map((t, idx) => {
-        const description = sanitizeText(t?.description);
-        const reference = sanitizeText(t?.reference);
-
-        const company = companies[idx % companies.length];
-
-        const nextDesc = looksPlaceholder(description) ? `EFT ${company}` : description;
-        const nextRef = looksPlaceholder(reference) ? `INV-${String(100000 + idx)}` : reference;
-
-        // If AI emits "Client A" etc in a longer sentence, patch it too.
-        const patchedDesc = nextDesc
-            .replace(/client\s+[a-z]/gi, company)
-            .replace(/company\s+[a-z]/gi, company);
-
-        const patchedRef = nextRef
-            .replace(/ref[_\s-]*[a-z0-9]+/gi, `REF-${String(900000 + idx)}`)
-            .replace(/auth[_\s-]*id/gi, 'AUTH');
-
-        // Keep explicit payroll/rent/fees text as-is.
-        const forceKeep = ['notification fee', 'monthly service fee', 'rental', 'rent', 'payroll', 'salary'];
-        const keep = forceKeep.some((k) => description.toLowerCase().includes(k));
-
-        return {
-            ...t,
-            description: keep ? description : patchedDesc,
-            reference: keep ? (reference || undefined) : (patchedRef || undefined),
-            authId: t?.authId ? String(t.authId) : ''
-        };
-    });
-};
-
-const enforceScheduledTransactions = (p: {
-    transactions: any[];
-    fromISO: string;
-    toISO: string;
-    salaryDay: number;
-    rentalDay: number;
-}) => {
-    const out = [...p.transactions];
-    return out;
-};
-
-const normalizeDatesWithinPeriod = (transactions: any[], fromISO: string, toISO: string) => {
-    return transactions.map((t) => {
-        const ref = String(t?.reference || '').toUpperCase();
-        const desc = String(t?.description || '').toLowerCase();
-        const isMandatory =
-            ref.includes('SAGE PAYROLL') ||
-            ref === 'RENT' ||
-            ref === 'MONTHLY SERVICE FEE' ||
-            ref === 'NOTIFICATION FEE';
-
-        const post = clampToPeriodISO(String(t?.postDate || toISO), fromISO, toISO);
-        const txn = clampToPeriodISO(String(t?.transactionDate || post), fromISO, toISO);
-        const postAdj = isMandatory ? post : nextBusinessDayISO(post);
-        const txnAdj = isMandatory ? txn : nextBusinessDayISO(txn);
-        return {
-            ...t,
-            postDate: clampToPeriodISO(postAdj, fromISO, toISO),
-            transactionDate: clampToPeriodISO(txnAdj, fromISO, toISO)
-        };
-    });
-};
 
 export const generateBusinessCapitecStatementsAI = async (input: GenerateBusinessCapitecInput): Promise<{
     statements: BankStatement[];
@@ -451,7 +111,9 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
             businessName: input.businessName,
             comment: input.comment,
             salaryDay: input.salaryDay,
+            salaryAmount: input.salaryAmount,
             rentalDay: input.rentalDay,
+            rentalAmount: input.rentalAmount,
             statementNumberStart: input.statementNumberStart,
             statementPeriod: period,
             openingBalance: runningOpening,
@@ -479,53 +141,69 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
         const parsed = parseJSONResponse(content);
         raw.push(parsed);
 
-        const withRulesApplied = {
+        const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+
+        // Determine closing balance:
+        // Prefer AI-provided balances; otherwise derive from transaction amounts/fees.
+        const aiClosing = parsed?.balances?.closingBalance;
+        const aiOpening = parsed?.balances?.openingBalance;
+
+        let closingBalance: number | null = typeof aiClosing === 'number' ? aiClosing : null;
+
+        // If the AI provided a closingBalance, trust it; else compute from the transactions.
+        if (closingBalance === null) {
+            let computed = runningOpening;
+            for (const t of transactions) {
+                const amount = toNumber(t?.amount);
+                const fees = t?.fees === undefined ? 0 : toNumber(t?.fees);
+                computed = round2(computed + amount + fees);
+            }
+            closingBalance = computed;
+        }
+
+        // Ensure transactions are passed through as authored by the AI.
+        // If balanceAfter is missing, compute it for downstream consumers, but do not alter other fields.
+        let runningBalance = runningOpening;
+        const transactionsWithBalance = transactions.map((t: any) => {
+            const amount = toNumber(t?.amount);
+            const fees = t?.fees === undefined ? undefined : toNumber(t?.fees);
+            runningBalance = round2(runningBalance + amount + (fees ?? 0));
+
+            if (t?.balanceAfter === undefined || typeof t.balanceAfter !== 'number') {
+                return {
+                    ...t,
+                    balanceAfter: runningBalance
+                };
+            }
+            return t;
+        });
+
+        const statement: BankStatement = {
             ...parsed,
-            transactions: normalizeDatesWithinPeriod(
-                cleanReferenceNotDescription(
-                    sanitizePlaceholders(
-                        enforceMonthEndFees(
-                            enforceScheduledTransactions({
-                                transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : [],
-                                fromISO: period.fromISO,
-                                toISO: period.toISO,
-                                salaryDay: input.salaryDay,
-                                rentalDay: input.rentalDay
-                            }),
-                            period.toISO
-                        )
-                    )
-                ),
-                period.fromISO,
-                period.toISO
-            )
+            account: {
+                ...(parsed?.account || {}),
+                accountNumber: input.accountNumber,
+                accountType: input.accountType,
+                businessName: input.businessName,
+                statementNumber: String(statementNo).padStart(5, '0'),
+                // Stamp date must be the current date
+                statementDate: stampDateISO,
+                page: 1,
+                totalPages: 1
+            },
+            balances: {
+                openingBalance: runningOpening,
+                closingBalance: closingBalance ?? runningOpening
+            },
+            address: input.address || parsed?.address || {},
+            bankDetails: input.bankDetails || parsed?.bankDetails || {},
+            transactions: transactionsWithBalance
         };
 
-        // Enforce our own continuity and balances regardless of AI mistakes.
-        const normalized = normalizeStatement(
-            {
-                ...withRulesApplied,
-                account: {
-                    ...(withRulesApplied?.account || {}),
-                    accountNumber: input.accountNumber,
-                    accountType: input.accountType,
-                    businessName: input.businessName,
-                    statementNumber: String(statementNo).padStart(5, '0'),
-                    // Stamp date must be the current date
-                    statementDate: stampDateISO,
-                    page: 1,
-                    totalPages: 1
-                },
-                address: input.address || withRulesApplied?.address || {},
-                bankDetails: input.bankDetails || withRulesApplied?.bankDetails || {}
-            },
-            runningOpening
-        );
-
         // Chain balances: next month opens with this month closing.
-        runningOpening = round2(normalized.balances.closingBalance);
+        runningOpening = closingBalance;
 
-        statements.push(normalized);
+        statements.push(statement);
     }
 
     return { statements, raw };
