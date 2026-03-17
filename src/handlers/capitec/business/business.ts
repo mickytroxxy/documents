@@ -220,15 +220,21 @@ export const generateNewHtml = async (data: BankStatement) => {
             </tr>
         `,
         ...data.transactions.map(
-            (t) => `<tr>
+            (t) => {
+                const amountHtml = (t.amount === null || t.amount === undefined) 
+                    ? '<td></td>' 
+                    : `<td class="amount ${t.type === 'credit' ? 'credit' : 'debit'}">${formatCurrency(t.amount)}</td>`;
+                
+                return `<tr>
                 <td style="width:40px;">${formatDateShort(t.postDate)}</td>
                 <td style="width:40px;">${formatDateShort(t.transactionDate)}</td>
                 <td>${t.reference ?? ''}</td>
                 <td>${t.description ?? ''}</td>
                 <td class="balance credit">${t.fees ? formatCurrency(t.fees) : ''}</td>
-                <td class="amount ${t.type === 'credit' ? 'credit' : 'debit'}">${formatCurrency(t.amount)}</td>
+                ${amountHtml}
                 <td class="balance ${t.balanceAfter >= 0 ? 'credit' : 'debit'}">${formatCurrency(t.balanceAfter)}</td>
-            </tr>`
+            </tr>`;
+            }
         ),
         `
             <tr>
@@ -477,21 +483,10 @@ export const generateNewHtml = async (data: BankStatement) => {
     `;
 };
 
-export const createBusinessBankStatementHandler = async (output: string, data: BankStatement) => {
-    const html = await generateNewHtml(data);
-
-    // Write HTML to /tmp (always writable on Cloud Run) and load it via file://
-    // instead of passing the giant HTML string over the DevTools protocol.
-    // This avoids "Timed out waiting for WS endpoint URL" for large (6-month) docs.
-    const tmpHtml = path.join('/tmp', `business_stmt_${Date.now()}.html`);
-    fs.writeFileSync(tmpHtml, html, 'utf8');
-
-    // Use the system Chromium set by PUPPETEER_EXECUTABLE_PATH env var in the
-    // Dockerfile (e.g. /usr/bin/chromium on Alpine). Without this, Puppeteer
-    // tries its own bundled binary which is absent when PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true.
+/** Launch a shared Puppeteer browser. Caller is responsible for closing it. */
+export const launchBrowser = async () => {
     const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-
-    const browser = await puppeteer.launch({
+    return puppeteer.launch({
         headless: true,
         ...(executablePath ? { executablePath } : {}),
         protocolTimeout: 6000000,
@@ -502,22 +497,46 @@ export const createBusinessBankStatementHandler = async (output: string, data: B
             '--disable-gpu',
         ],
     });
+};
+
+/**
+ * Generate one PDF statement.
+ * Pass a pre-launched `browser` to reuse it across multiple calls and avoid
+ * the cost of starting/stopping Chromium for every statement.
+ */
+export const createBusinessBankStatementHandler = async (
+    output: string,
+    data: BankStatement,
+    browser?: Awaited<ReturnType<typeof puppeteer.launch>>
+) => {
+    const html = await generateNewHtml(data);
+
+    // Write to /tmp so we can use page.goto('file://...') instead of
+    // passing the giant HTML string over the DevTools WebSocket protocol.
+    const tmpHtml = path.join('/tmp', `business_stmt_${Date.now()}.html`);
+    fs.writeFileSync(tmpHtml, html, 'utf8');
+
+    const ownBrowser = !browser;
+    const b = browser ?? await launchBrowser();
 
     try {
-        const page = await browser.newPage();
+        const page = await b.newPage();
         page.setDefaultNavigationTimeout(0);
         page.setDefaultTimeout(0);
 
-        await page.goto(`file://${tmpHtml}`, { waitUntil: 'domcontentloaded' });
-
-        await page.pdf({
-            path: output,
-            format: 'A4',
-            printBackground: true,
-            margin: { top: 0, bottom: 0, left: 0, right: 0 },
-        });
+        try {
+            await page.goto(`file://${tmpHtml}`, { waitUntil: 'domcontentloaded' });
+            await page.pdf({
+                path: output,
+                format: 'A4',
+                printBackground: true,
+                margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            });
+        } finally {
+            await page.close();
+        }
     } finally {
-        await browser.close();
+        if (ownBrowser) await b.close();
         try { fs.unlinkSync(tmpHtml); } catch (_) {}
     }
 };

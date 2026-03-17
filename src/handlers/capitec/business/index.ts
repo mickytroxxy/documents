@@ -5,7 +5,7 @@ import { Request, Response } from 'express';
 import { secrets } from '../../../server';
 import { BankStatement, Transaction } from './business_sample';
 import { generateBusinessCapitecStatementsAI } from './ai';
-import { createBusinessBankStatementHandler } from './business';
+import { createBusinessBankStatementHandler, launchBrowser } from './business';
 import { generateFinancialStatementFromPdf } from './financial';
 
 export type GenerateBusinessBankStatementRequest = {
@@ -204,53 +204,58 @@ export const generate_business_bank_statement = async (req: Request, res: Respon
         const urls: string[] = [];
         const baseUrl = secrets?.BASE_URL;
 
-        // Always create the monthly statements (based on months input
-        for (let i = 0; i < statements.length; i++) {
-            const stmt = statements[i];
-            const filename = `Account Statement_${stmt.account.statementNumber}_${stmt.account.statementDate}.pdf`;
-            const outPath = path.join(folder, filename);
+        // Launch a single Chromium instance and reuse it for all PDFs.
+        // This avoids the 30-second startup overhead per statement which
+        // causes upstream timeouts on Cloud Run for 6+ month requests.
+        const browser = await launchBrowser();
+        try {
+            // Always create the monthly statements
+            for (let i = 0; i < statements.length; i++) {
+                const stmt = statements[i];
+                const filename = `Account Statement_${stmt.account.statementNumber}_${stmt.account.statementDate}.pdf`;
+                const outPath = path.join(folder, filename);
 
-            await createBusinessBankStatementHandler(outPath, stmt);
+                await createBusinessBankStatementHandler(outPath, stmt, browser);
 
-            if (fs.existsSync(outPath)) {
-                urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
-            }
-        }
-
-        // If financials.required is true, also create the long merged statement for Gemini
-        if (financials?.required) {
-            const mergedStatement = mergeBankStatements(statements);
-            
-            const startDateStr = financials.startDate;
-            const endDateStr = financials.endDate || new Date().toISOString().slice(0, 10);
-            const filename = `Financial Reference_${startDateStr}_to_${endDateStr}.pdf`;
-            const outPath = path.join(folder, filename);
-
-            await createBusinessBankStatementHandler(outPath, mergedStatement);
-
-            if (fs.existsSync(outPath)) {
-                urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
-            }
-            
-            console.log(`Created long merged statement for financials: ${filename}`);
-            
-            // Generate comprehensive financial statement using Gemini
-            try {
-                // Generate financial statement from the merged PDF
-                const financialResultPath = await generateFinancialStatementFromPdf(outPath,accountNumber, financials.accountingCompanyName, financials.directorName);
-                
-                if (fs.existsSync(financialResultPath)) {
-                    const financialFilename = path.basename(financialResultPath);
-                    // Copy to the business folder for easier access
-                    const financialDestPath = path.join(folder, financialFilename);
-                    fs.copyFileSync(financialResultPath, financialDestPath);
-                    urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${financialFilename}`);
-                    console.log(`Created comprehensive financial statement: ${financialFilename}`);
+                if (fs.existsSync(outPath)) {
+                    urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
                 }
-            } catch (financialError) {
-                console.error('Error generating financial statement:', financialError);
-                // Don't fail the whole request if financial generation fails
             }
+
+            // If financials.required is true, also create the long merged statement for Gemini
+            if (financials?.required) {
+                const mergedStatement = mergeBankStatements(statements);
+
+                const startDateStr = financials.startDate;
+                const endDateStr = financials.endDate || new Date().toISOString().slice(0, 10);
+                const filename = `Financial Reference_${startDateStr}_to_${endDateStr}.pdf`;
+                const outPath = path.join(folder, filename);
+
+                await createBusinessBankStatementHandler(outPath, mergedStatement, browser);
+
+                if (fs.existsSync(outPath)) {
+                    urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${filename}`);
+                }
+
+                console.log(`Created long merged statement for financials: ${filename}`);
+
+                // Generate comprehensive financial statement using Gemini
+                try {
+                    const financialResultPath = await generateFinancialStatementFromPdf(outPath, accountNumber, financials.accountingCompanyName, financials.directorName);
+
+                    if (fs.existsSync(financialResultPath)) {
+                        const financialFilename = path.basename(financialResultPath);
+                        const financialDestPath = path.join(folder, financialFilename);
+                        fs.copyFileSync(financialResultPath, financialDestPath);
+                        urls.push(`${baseUrl}/business/${normalizedBankName.toLowerCase()}/${accountNumber}/${financialFilename}`);
+                        console.log(`Created comprehensive financial statement: ${financialFilename}`);
+                    }
+                } catch (financialError) {
+                    console.error('Error generating financial statement:', financialError);
+                }
+            }
+        } finally {
+            await browser.close();
         }
 
         return res.status(200).json({

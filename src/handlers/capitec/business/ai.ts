@@ -143,40 +143,63 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
 
         const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
 
-        // Determine closing balance:
-        // Prefer AI-provided balances; otherwise derive from transaction amounts/fees.
-        const aiClosing = parsed?.balances?.closingBalance;
-        const aiOpening = parsed?.balances?.openingBalance;
-
-        let closingBalance: number | null = typeof aiClosing === 'number' ? aiClosing : null;
-
-        // If the AI provided a closingBalance, trust it; else compute from the transactions.
-        if (closingBalance === null) {
-            let computed = runningOpening;
-            for (const t of transactions) {
-                const amount = toNumber(t?.amount);
-                const fees = t?.fees === undefined ? 0 : toNumber(t?.fees);
-                computed = round2(computed + amount + fees);
-            }
-            closingBalance = computed;
-        }
-
-        // Ensure transactions are passed through as authored by the AI.
-        // If balanceAfter is missing, compute it for downstream consumers, but do not alter other fields.
+        // Recompute balanceAfter for every transaction from scratch using the
+        // AI's exact amount and fees values.
+        // Rules enforced here (without patching any amounts):
+        //   • fees are ALWAYS negative (bank charges) — if AI returned positive, negate it
+        //   • a debit that would push the balance below 0 is dropped (opening balance is
+        //     the current balance limit — no transaction can exceed it unless it is a credit)
         let runningBalance = runningOpening;
-        const transactionsWithBalance = transactions.map((t: any) => {
-            const amount = toNumber(t?.amount);
-            const fees = t?.fees === undefined ? undefined : toNumber(t?.fees);
-            runningBalance = round2(runningBalance + amount + (fees ?? 0));
+        const fixed = transactions
+            .filter((t: any) => {
+                const amt = toNumber(t?.amount);
+                const fee = t.fees !== undefined ? toNumber(t.fees) : 0;
+                // Keep the transaction if it has a non-zero amount OR a non-zero fee
+                return amt !== 0 || fee !== 0;
+            })
+            .reduce((acc: any[], t: any) => {
+                // If the transaction is pure fee (like Monthly Service Fee), amount is 0/null.
+                const rawAmount = t.amount;
+                const amount = (rawAmount === null || rawAmount === undefined) ? null : toNumber(rawAmount);
+                
+                // Fees must ALWAYS be negative (debit). If AI returned positive, negate it.
+                let fees: number | undefined = undefined;
+                if (t.fees !== undefined) {
+                    const rawFee = toNumber(t.fees);
+                    fees = rawFee > 0 ? -rawFee : rawFee; // force negative
+                }
+                const feeVal = fees ?? 0;
+                const amountVal = amount ?? 0;
 
-            if (t?.balanceAfter === undefined || typeof t.balanceAfter !== 'number') {
-                return {
-                    ...t,
-                    balanceAfter: runningBalance
-                };
+                // Skip any debit that would push balance below 0.
+                // Opening balance == current balance cap — no money-out can exceed it.
+                if (amountVal < 0 && round2(runningBalance + amountVal + feeVal) < 0) {
+                    return acc; // drop this transaction entirely — don't patch, don't insert
+                }
+
+                runningBalance = round2(runningBalance + amountVal + feeVal);
+                
+                // Keep the actual amount from the AI: if it's null (for fee only), it stays null
+                acc.push({ ...t, amount: amount, fees, balanceAfter: runningBalance });
+                return acc;
+            }, []);
+
+        const closingBalance = round2(runningBalance);
+
+        // Use fee totals from the AI if provided; otherwise sum from transactions.
+        const aiFeeTotalAbs = parsed?.fees?.feeTotal !== undefined ? Math.abs(toNumber(parsed.fees.feeTotal)) : undefined;
+        let feeTotal: number;
+        let vatTotal: number;
+        if (aiFeeTotalAbs !== undefined && aiFeeTotalAbs > 0) {
+            feeTotal = aiFeeTotalAbs;
+            vatTotal = parsed?.fees?.vatTotal !== undefined ? Math.abs(toNumber(parsed.fees.vatTotal)) : round2(feeTotal * 0.15);
+        } else {
+            feeTotal = 0;
+            for (const t of fixed) {
+                if (t.fees !== undefined) feeTotal = round2(feeTotal + Math.abs(toNumber(t.fees)));
             }
-            return t;
-        });
+            vatTotal = round2(feeTotal * 0.15);
+        }
 
         const statement: BankStatement = {
             ...parsed,
@@ -186,21 +209,25 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
                 accountType: input.accountType,
                 businessName: input.businessName,
                 statementNumber: String(statementNo).padStart(5, '0'),
-                // Stamp date must be the current date
                 statementDate: stampDateISO,
                 page: 1,
                 totalPages: 1
             },
             balances: {
                 openingBalance: runningOpening,
-                closingBalance: closingBalance ?? runningOpening
+                closingBalance
+            },
+            fees: {
+                feeTotal: -feeTotal,
+                vatTotal: -vatTotal,
+                vatRate: '15.00%'
             },
             address: input.address || parsed?.address || {},
             bankDetails: input.bankDetails || parsed?.bankDetails || {},
-            transactions: transactionsWithBalance
+            transactions: fixed
         };
 
-        // Chain balances: next month opens with this month closing.
+        // Chain: next month's opening = this month's closing
         runningOpening = closingBalance;
 
         statements.push(statement);
