@@ -3,7 +3,8 @@ import { BankStatement } from './business_sample';
 import { generateHtml } from './html';
 
 (async () => {
-    const data: BankStatement = require('./business_sample').CapitecBankStatement;
+    const dataArray: BankStatement[] = require('./business_sample').CapitecBankStatement;
+    const data = dataArray[0]; // Use the first statement for testing
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     const html = generateHtml(data);
