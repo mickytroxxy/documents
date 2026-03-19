@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { getSecretKeys } from '../../../helpers/api';
 import { parseJSONResponse } from '../../../ai/shared';
-import { BankStatement } from './business_sample';
+import { BankStatement, Transaction } from './business_sample';
 import { formBusinessCapitecPrompt } from './prompt';
 
 export type GenerateBusinessCapitecInput = {
@@ -78,6 +78,7 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
     raw: any[];
 }> => {
     const months = clampMonths(input.months);
+    console.log(`AI: Processing ${months} months, targetFinalClosingBalance: ${input.targetFinalClosingBalance}, openingBalance: ${input.openingBalance}`);
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
@@ -90,15 +91,21 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
     });
 
     const periods = buildPeriods(months);
+    console.log(`AI: Built ${periods.length} periods:`, periods.map(p => `${p.fromISO} to ${p.toISO}`));
     const statements: BankStatement[] = [];
     const raw: any[] = [];
 
     let runningOpening = round2(input.openingBalance);
-
+    const totalDelta = input.targetFinalClosingBalance! - input.openingBalance;
     for (let i = 0; i < months; i++) {
         const period = periods[i];
-        const isLast = i === months - 1;
-        const targetClosing = isLast ? input.targetFinalClosingBalance : undefined;
+        const monthlyDelta = totalDelta / months;
+
+        const targetClosing = round2(
+            runningOpening + monthlyDelta
+        );
+
+
         const statementNo = (input.statementNumberStart ?? 1) + i;
 
         const stampDateISO = isoDateOnly(new Date());
@@ -150,8 +157,8 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
         //   • a debit that would push the balance below 0 is dropped (opening balance is
         //     the current balance limit — no transaction can exceed it unless it is a credit)
         let runningBalance = runningOpening;
-        const fixed = transactions
-            .filter((t: any) => {
+        let fixed = transactions
+            .filter((t: Transaction) => {
                 const amt = toNumber(t?.amount);
                 const fee = t.fees !== undefined ? toNumber(t.fees) : 0;
                 // Keep the transaction if it has a non-zero amount OR a non-zero fee
@@ -183,8 +190,30 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
                 acc.push({ ...t, amount: amount, fees, balanceAfter: runningBalance });
                 return acc;
             }, []);
-
+        
+        console.log('Before fee patch, sample transactions:', fixed?.slice(-3).map((t: any) => ({ desc: t.description, ref: t.reference, amount: t.amount, fees: t.fees })));
+        
+        fixed = fixed?.map((t: Transaction) => {
+            const isServiceFee = (t.reference?.toLowerCase().includes('service') || t.description?.toLowerCase().includes('service')) && 
+                                 (t.reference?.toLowerCase().includes('fee') || t.description?.toLowerCase().includes('fee'));
+            const isNotificationFee = (t.reference?.toLowerCase().includes('notification') || t.description?.toLowerCase().includes('notification')) &&
+                                     (t.reference?.toLowerCase().includes('fee') || t.description?.toLowerCase().includes('fee'));
+            
+            if (isServiceFee) {
+                console.log(`Patching Service Fee: desc='${t.description}', ref='${t.reference}'`);
+                return { ...t, description: '', reference: 'Monthly Service Fee' };
+            }
+            if (isNotificationFee) {
+                console.log(`Patching Notification Fee: desc='${t.description}', ref='${t.reference}'`);
+                return { ...t, description: '', reference: 'Notification Fee' };
+            }
+            return t;
+        });
+        
+        console.log('After fee patch, sample transactions:', fixed?.slice(-3).map((t: any) => ({ desc: t.description, ref: t.reference, amount: t.amount, fees: t.fees })));
         const closingBalance = round2(runningBalance);
+
+        console.log(`AI Response: Generated closingBalance: ${closingBalance}, requested target: ${targetClosing}`);
 
         // Use fee totals from the AI if provided; otherwise sum from transactions.
         const aiFeeTotalAbs = parsed?.fees?.feeTotal !== undefined ? Math.abs(toNumber(parsed.fees.feeTotal)) : undefined;

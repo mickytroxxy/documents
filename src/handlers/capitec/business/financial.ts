@@ -186,8 +186,8 @@ Accounting Firm / Preparer: ${accountingCompanyName}
 OUTPUT FORMAT REQUIREMENTS
 
 Return ONLY valid HTML.
-
-DO NOT return markdown.
+I NEED the HTML to be perfectly structured and formatted for PDF generation. 
+SHOULD BE VERY BEAUTIFUL AND PROFESSIONAL.
 DO NOT include explanations outside the HTML.
 
 The document must be ready for PDF generation.
