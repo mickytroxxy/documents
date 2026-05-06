@@ -89,15 +89,17 @@ export const Main = () => {
         //     }
         // })();
         //generateIdImage('output.png');
-        // const testIdInfo = {
-        //     first_name: 'FLORIS CHRISTIAN',
-        //     last_name: 'VISSER',
-        //     id: '8810135016081',
-        //     gender: 'M',
-        //     dob: '13 OCT 1988',
-        //     issuing_date: '31 JUL 2015',
-        //     documentId: '116555883'
-        // };
+
+        const testIdInfo = {
+            first_name: 'LIZZY MAPOTLAKELA',
+            last_name: 'DIANGWANE',
+            id: '9410200902080',
+            gender: 'F',
+            dob: '20 OCT 1994',
+            issuing_date: '23 JAN 2023',
+            documentId: '116555883'
+        };
+        generateIdImage(testIdInfo, 'output.png');
         // psdEditorHandler(testIdInfo);
         
         // Note: generateFinancialStatementFromPdf is now called from the API endpoint

@@ -101,7 +101,7 @@ Use these EXACT totals:
 
 THIS IS A HARD FAILURE CONDITION.
 If currentBalance < payment amount → YOU MUST REDUCE THE PAYMENT.
-
+GENERATE AT LEAST 60 TRANSACTIONS SPREAD OVER THE PERIOD
 ================================================================
 DATE & SALARY RULES
 ================================================================
