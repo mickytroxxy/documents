@@ -83,7 +83,7 @@ export const generateIdImage = async (idInfo: IdInfo, outputPath: string, photoB
         .toBuffer();
     const mask = Buffer.from(
         `<svg width="340" height="450">
-           <rect x="0" y="0" width="340" height="400" rx="5" ry="5" />
+           <rect x="0" y="0" width="340" height="450" rx="5" ry="5" />
          </svg>`
     );
     const photoBufferProcessed = await sharp(usedPhotoBuffer)
@@ -113,7 +113,7 @@ export const generateIdImage = async (idInfo: IdInfo, outputPath: string, photoB
             { input: Buffer.from(date_of_birth), top: 355, left: 63 + 4 },
             { input: Buffer.from(country_of_birth), top: 425, left: 63 + 6 },
             { input: Buffer.from(status), top: 495, left: 63 + 7 },
-            { input: photoBufferProcessed, top: 160, left: 875 },
+            { input: photoBufferProcessed, top: 150, left: 875 },
             { input: signBuffer, top: 700, left: 900 },
             //{ input: holoBuffer, top: 235, left: 1120 },
             { input: Buffer.from(circleSvg), top: 0, left: 0 },
