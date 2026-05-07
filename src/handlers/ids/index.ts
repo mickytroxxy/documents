@@ -564,11 +564,11 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
         const randomBool = () => Math.random() >= 0.5;
 
-        // Random rotations -15 to +25 degrees
+        // Random rotations
         const frontRotation = randomInRange(-15, 25);
         const backRotation = randomInRange(-15, 25);
 
-        // Randomly decide which image goes on top (appears later in HTML = higher z-index)
+        // Randomly swap which image is on top
         const frontOnTop = randomBool();
 
         // Read and convert images to grayscale
@@ -580,29 +580,24 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const frontBase64 = `data:image/png;base64,${frontBuffer.toString('base64')}`;
         const backBase64 = `data:image/png;base64,${backBuffer.toString('base64')}`;
 
-        // Random widths (420-520px) - different sizes for visual interest
+        // Random widths
         const frontWidth = randomInt(420, 520);
         const backWidth = randomInt(420, 520);
 
         // Determine positions - ensure no overlap
-        // First image position
         const pos1Top = randomInt(30, 100);
         const pos1Left = randomInt(30, 80);
 
-        // Second image position - ensure minimum 200px separation horizontally OR vertically
         let pos2Top, pos2Left;
         const arrangement = randomInt(1, 3);
 
         if (arrangement === 1) {
-            // Side by side: second image to the right
             pos2Top = randomInt(30, 100);
             pos2Left = pos1Left + Math.max(frontWidth, backWidth) + randomInt(50, 150);
         } else if (arrangement === 2) {
-            // Side by side: second image to the left
             pos2Top = randomInt(30, 100);
             pos2Left = pos1Left - Math.max(frontWidth, backWidth) - randomInt(50, 150);
         } else {
-            // Stacked: second image below
             pos2Top = pos1Top + 380;
             pos2Left = randomInt(30, 80);
         }
@@ -619,8 +614,6 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const firstPosLeft = frontOnTop ? pos1Left : pos2Left;
         const secondPosTop = frontOnTop ? pos2Top : pos1Top;
         const secondPosLeft = frontOnTop ? pos2Left : pos1Left;
-        const firstLabel = frontOnTop ? 'FRONT ID' : 'BACK ID';
-        const secondLabel = frontOnTop ? 'BACK ID' : 'FRONT ID';
 
         const html = `
 <!DOCTYPE html>
@@ -637,7 +630,6 @@ body {
     padding: 0;
     margin: 0;
     overflow: hidden;
-    font-family: Arial, sans-serif;
 }
 .id-wrap {
     position: absolute;
@@ -645,37 +637,15 @@ body {
 }
 .id-img {
     display: block;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    border: 1px solid #999;
-    background: white;
-}
-.id-label {
-    font-size: 11px;
-    font-weight: bold;
-    color: #222;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 3px;
-}
-.rot-info {
-    font-size: 8px;
-    color: #666;
 }
 </style>
 </head>
 <body>
-<!-- First (bottom) image -->
 <div class="id-wrap" style="top: ${secondPosTop}px; left: ${secondPosLeft}px; transform: rotate(${secondRotation}deg); z-index: 1;">
-    <div class="id-label">${secondLabel}</div>
-    <img class="id-img" src="${secondBase64}" width="${secondWidth}" alt="${secondLabel}"/>
-    <div class="rot-info">Rotation: ${secondRotation.toFixed(1)}°</div>
+    <img class="id-img" src="${secondBase64}" width="${secondWidth}"/>
 </div>
-
-<!-- Second (top) image -->
 <div class="id-wrap" style="top: ${firstPosTop}px; left: ${firstPosLeft}px; transform: rotate(${firstRotation}deg); z-index: 2;">
-    <div class="id-label">${firstLabel}</div>
-    <img class="id-img" src="${firstBase64}" width="${firstWidth}" alt="${firstLabel}"/>
-    <div class="rot-info">Rotation: ${firstRotation.toFixed(1)}°</div>
+    <img class="id-img" src="${firstBase64}" width="${firstWidth}"/>
 </div>
 </body>
 </html>
@@ -721,7 +691,7 @@ body {
 
         await browser.close();
 
-        console.log(`✓ Combined PDF: ${outputPath} | Front rot=${frontRotation.toFixed(1)}° | Back rot=${backRotation.toFixed(1)}° | Top: ${firstLabel}`);
+        console.log(`✓ Combined PDF: ${outputPath} | Front rot=${frontRotation.toFixed(1)}° | Back rot=${backRotation.toFixed(1)}° | Top: ${frontOnTop ? 'Front' : 'Back'}`);
         return outputPath;
     } catch (error) {
         console.error('Error generating combined PDF:', error);
