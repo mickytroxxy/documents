@@ -563,80 +563,50 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
         const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
         const randomBool = () => Math.random() >= 0.5;
-        const randomItem = <T>(arr: T[]) => arr[randomInt(0, arr.length - 1)];
 
-        // Random rotations with wider ranges (including negative)
-        const frontRotation = randomInRange(-15, 45);
-        const backRotation = randomInRange(-15, 45);
+        // Random rotations -15 to +25 degrees
+        const frontRotation = randomInRange(-15, 25);
+        const backRotation = randomInRange(-15, 25);
 
-        // Randomly swap which image is on top
+        // Randomly decide which image goes on top (appears later in HTML = higher z-index)
         const frontOnTop = randomBool();
 
-        // Random color effect for each image
-        const colorEffects = ['grayscale', 'sepia', 'invert', 'none'] as const;
-        const frontEffect = colorEffects[randomInt(0, colorEffects.length - 1)];
-        const backEffect = colorEffects[randomInt(0, colorEffects.length - 1)];
-
-        // Random brightness/saturation variations
-        const frontBrightness = randomInRange(0.85, 1.15);
-        const frontSaturation = randomInRange(0.5, 1.5);
-        const backBrightness = randomInRange(0.85, 1.15);
-        const backSaturation = randomInRange(0.5, 1.5);
-
-        // Apply color effects and read images
-        let frontPipeline = sharp(frontImagePath);
-        let backPipeline = sharp(backImagePath);
-
-        switch (frontEffect) {
-            case 'grayscale': frontPipeline = frontPipeline.grayscale(); break;
-            case 'sepia': frontPipeline = frontPipeline.tint({ r: 112, g: 66, b: 20 }); break;
-            case 'invert': frontPipeline = frontPipeline.negate(); break;
-            case 'none': break;
-        }
-        frontPipeline = frontPipeline.modulate({ brightness: frontBrightness, saturation: frontSaturation }).png();
-
-        switch (backEffect) {
-            case 'grayscale': backPipeline = backPipeline.grayscale(); break;
-            case 'sepia': backPipeline = backPipeline.tint({ r: 112, g: 66, b: 20 }); break;
-            case 'invert': backPipeline = backPipeline.negate(); break;
-            case 'none': break;
-        }
-        backPipeline = backPipeline.modulate({ brightness: backBrightness, saturation: backSaturation }).png();
-
+        // Read and convert images to grayscale
         const [frontBuffer, backBuffer] = await Promise.all([
-            frontPipeline.toBuffer(),
-            backPipeline.toBuffer()
+            sharp(frontImagePath).grayscale().png().toBuffer(),
+            sharp(backImagePath).grayscale().png().toBuffer()
         ]);
 
-        // Convert to base64 data URLs
         const frontBase64 = `data:image/png;base64,${frontBuffer.toString('base64')}`;
         const backBase64 = `data:image/png;base64,${backBuffer.toString('base64')}`;
 
-        // Random positions (ensuring no overlap and fitting within page)
-        const frontMarginTop = randomInt(20, 80);
-        const frontMarginLeft = randomInt(20, 100);
-        const backMarginTop = randomInt(20, 80);
-        const backMarginLeft = randomInt(20, 100);
+        // Random widths (420-520px) - different sizes for visual interest
+        const frontWidth = randomInt(420, 520);
+        const backWidth = randomInt(420, 520);
 
-        // Ensure images don't overlap by keeping sufficient separation
-        const marginBetween = Math.abs(frontMarginLeft - backMarginLeft);
-        const finalBackMarginLeft = marginBetween < 150 ? 
-            (backMarginLeft > frontMarginLeft ? backMarginLeft + 150 : backMarginLeft - 150) : 
-            backMarginLeft;
+        // Determine positions - ensure no overlap
+        // First image position
+        const pos1Top = randomInt(30, 100);
+        const pos1Left = randomInt(30, 80);
 
-        // Random image widths (keeping aspect ratio)
-        const frontWidth = randomInt(400, 550);
-        const backWidth = randomInt(400, 550);
+        // Second image position - ensure minimum 200px separation horizontally OR vertically
+        let pos2Top, pos2Left;
+        const arrangement = randomInt(1, 3);
 
-        // Background color variations
-        const bgColors = ['#ffffff', '#fafafa', '#f5f5f5', '#f0f0f0', '#fdfdfd'];
-        const bgColor = randomItem(bgColors);
+        if (arrangement === 1) {
+            // Side by side: second image to the right
+            pos2Top = randomInt(30, 100);
+            pos2Left = pos1Left + Math.max(frontWidth, backWidth) + randomInt(50, 150);
+        } else if (arrangement === 2) {
+            // Side by side: second image to the left
+            pos2Top = randomInt(30, 100);
+            pos2Left = pos1Left - Math.max(frontWidth, backWidth) - randomInt(50, 150);
+        } else {
+            // Stacked: second image below
+            pos2Top = pos1Top + 380;
+            pos2Left = randomInt(30, 80);
+        }
 
-        // Opacity variations for layered look
-        const frontOpacity = randomInRange(0.92, 1);
-        const backOpacity = randomInRange(0.92, 1);
-
-        // Create HTML with both images - order depends on frontOnTop
         const firstImage = frontOnTop ? 'front' : 'back';
         const secondImage = frontOnTop ? 'back' : 'front';
         const firstBase64 = frontOnTop ? frontBase64 : backBase64;
@@ -645,77 +615,72 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
         const secondWidth = frontOnTop ? backWidth : frontWidth;
         const firstRotation = frontOnTop ? frontRotation : backRotation;
         const secondRotation = frontOnTop ? backRotation : frontRotation;
-        const firstMarginTop = frontOnTop ? frontMarginTop : backMarginTop;
-        const firstMarginLeft = frontOnTop ? frontMarginLeft : finalBackMarginLeft;
-        const secondMarginTop = frontOnTop ? backMarginTop : frontMarginTop;
-        const secondMarginLeft = frontOnTop ? finalBackMarginLeft : frontMarginLeft;
-        const firstOpacity = frontOnTop ? frontOpacity : backOpacity;
-        const secondOpacity = frontOnTop ? backOpacity : frontOpacity;
-        const firstLabel = frontOnTop ? 'Front ID' : 'Back ID';
-        const secondLabel = frontOnTop ? 'Back ID' : 'Front ID';
+        const firstPosTop = frontOnTop ? pos1Top : pos2Top;
+        const firstPosLeft = frontOnTop ? pos1Left : pos2Left;
+        const secondPosTop = frontOnTop ? pos2Top : pos1Top;
+        const secondPosLeft = frontOnTop ? pos2Left : pos1Left;
+        const firstLabel = frontOnTop ? 'FRONT ID' : 'BACK ID';
+        const secondLabel = frontOnTop ? 'BACK ID' : 'FRONT ID';
 
         const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8"/>
-                <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { 
-                        background: ${bgColor}; 
-                        min-height: 100vh; 
-                        width: 210mm; 
-                        height: 297mm;
-                        padding: 10mm;
-                        position: relative;
-                        overflow: hidden;
-                    }
-                    .id-image {
-                        position: absolute;
-                        transition: transform 0.3s ease;
-                        opacity: ${firstOpacity};
-                    }
-                    .id-image.second {
-                        opacity: ${secondOpacity};
-                        z-index: 1;
-                    }
-                    .id-image.first {
-                        z-index: 2;
-                    }
-                    .id-label {
-                        font-family: Arial, sans-serif;
-                        font-size: 12px;
-                        color: #444;
-                        font-weight: bold;
-                        margin-bottom: 4px;
-                    }
-                    .rotation-hint {
-                        font-family: Arial, sans-serif;
-                        font-size: 8px;
-                        color: #888;
-                        font-style: italic;
-                    }
-                </style>
-            </head>
-            <body>
-                <!-- Second image (below) -->
-                <div class="id-image second" style="top: ${secondMarginTop}px; left: ${secondMarginLeft}px; transform: rotate(${secondRotation}deg);">
-                    <div class="id-label">${secondLabel}</div>
-                    <img src="${secondBase64}" alt="${secondLabel}" width="${secondWidth}" style="box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #ddd;"/>
-                    <div class="rotation-hint">Rotation: ${secondRotation.toFixed(1)}° | Effect: ${frontOnTop ? (backEffect === 'none' ? 'original' : backEffect) : (frontEffect === 'none' ? 'original' : frontEffect)}</div>
-                </div>
-                
-                <!-- First image (on top) -->
-                <div class="id-image first" style="top: ${firstMarginTop}px; left: ${firstMarginLeft}px; transform: rotate(${firstRotation}deg);">
-                    <div class="id-label">${firstLabel}</div>
-                    <img src="${firstBase64}" alt="${firstLabel}" width="${firstWidth}" style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #ccc;"/>
-                    <div class="rotation-hint">Rotation: ${firstRotation.toFixed(1)}° | Effect: ${frontOnTop ? (frontEffect === 'none' ? 'original' : frontEffect) : (backEffect === 'none' ? 'original' : backEffect)}</div>
-                </div>
-            </body>
-            </html>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #ffffff;
+    width: 210mm;
+    height: 297mm;
+    position: relative;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+.id-wrap {
+    position: absolute;
+    transform-origin: center center;
+}
+.id-img {
+    display: block;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border: 1px solid #999;
+    background: white;
+}
+.id-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #222;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+.rot-info {
+    font-size: 8px;
+    color: #666;
+}
+</style>
+</head>
+<body>
+<!-- First (bottom) image -->
+<div class="id-wrap" style="top: ${secondPosTop}px; left: ${secondPosLeft}px; transform: rotate(${secondRotation}deg); z-index: 1;">
+    <div class="id-label">${secondLabel}</div>
+    <img class="id-img" src="${secondBase64}" width="${secondWidth}" alt="${secondLabel}"/>
+    <div class="rot-info">Rotation: ${secondRotation.toFixed(1)}°</div>
+</div>
+
+<!-- Second (top) image -->
+<div class="id-wrap" style="top: ${firstPosTop}px; left: ${firstPosLeft}px; transform: rotate(${firstRotation}deg); z-index: 2;">
+    <div class="id-label">${firstLabel}</div>
+    <img class="id-img" src="${firstBase64}" width="${firstWidth}" alt="${firstLabel}"/>
+    <div class="rot-info">Rotation: ${firstRotation.toFixed(1)}°</div>
+</div>
+</body>
+</html>
         `;
 
-        // Launch puppeteer with maximum stability settings for Docker
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
@@ -756,7 +721,7 @@ export const generateCombinedIdPdf = async (frontImagePath: string, backImagePat
 
         await browser.close();
 
-        console.log(`✓ Combined PDF generated: ${outputPath} | Front: ${frontEffect} rot=${frontRotation.toFixed(1)}° | Back: ${backEffect} rot=${backRotation.toFixed(1)}° | Top: ${firstLabel}`);
+        console.log(`✓ Combined PDF: ${outputPath} | Front rot=${frontRotation.toFixed(1)}° | Back rot=${backRotation.toFixed(1)}° | Top: ${firstLabel}`);
         return outputPath;
     } catch (error) {
         console.error('Error generating combined PDF:', error);
