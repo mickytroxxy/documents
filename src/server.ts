@@ -19,6 +19,7 @@ import { CapitecBankStatement } from './handlers/capitec/business/business_sampl
 import { generateIdImage } from './handlers/ids';
 import { psdEditorHandler } from './handlers/ids/psdEditor';
 import { generateFinancialStatementFromPdf } from './handlers/capitec/business/financial';
+import { sendWhatsAppMessage } from './utils/whatsapp';
 export const app = express();
 export const application = app;
 export let httpServer: ReturnType<typeof http.createServer>;
@@ -105,6 +106,11 @@ export const Main = () => {
         // Note: generateFinancialStatementFromPdf is now called from the API endpoint
         // when generating business bank statements with financials: { required: true }
         //generateFinancialStatementFromPdf(path.join(__dirname, '.','input.pdf'), '1234567890', 'Empire Digitals', 'Lameck Ndhlovu')
+        // sendWhatsAppMessage('Hello from Gauteng Tech!', '+27658016132').then(response => {
+        //     console.log('WhatsApp message sent successfully:', response);
+        // }).catch(error => {
+        //     console.error('Error sending WhatsApp message:', error);
+        // });
     });
 };
 

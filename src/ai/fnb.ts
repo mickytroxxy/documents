@@ -83,9 +83,8 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
         accountType
     } = data;
 
-    if (!physicalAddress) {
-        throw new Error('physicalAddress is required to generate FNB statements');
-    }
+    // Use a sensible default if physicalAddress was not provided
+    const resolvedAddress = physicalAddress || 'South Africa';
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
@@ -155,7 +154,7 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
             currentMonth: i + 1,
             totalMonths: months,
             openingBalance: currentBalance, // carried-over balance
-            physicalAddress,
+            physicalAddress: resolvedAddress,
             companyName,
             isLastMonth: i === months - 1,
             comment,
