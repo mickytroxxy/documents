@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecretKeys } from '../../../helpers/api';
 import { parseJSONResponse } from '../../../ai/shared';
 import { BankStatement, Transaction } from './business_sample';
@@ -82,12 +82,12 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
-        throw new Error('DeepSeek API key not found in database');
+        throw new Error('Gemini API key not found in database');
     }
 
-    const deepseek = new OpenAI({
-        apiKey: keys[0].DEEP_SEEK_API,
-        baseURL: 'https://api.deepseek.com/v1'
+    const genAI = new GoogleGenerativeAI(keys[0].DEEP_SEEK_API);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-3.1-pro-preview'
     });
 
     const periods = buildPeriods(months);
@@ -130,21 +130,11 @@ export const generateBusinessCapitecStatementsAI = async (input: GenerateBusines
             vatRate: '15.00%'
         });
 
-        const completion = await deepseek.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                {
-                    role: 'system',
-                    content: `Generate realistic South African BUSINESS bank statement data in valid JSON format only.`
-                },
-                { role: 'user', content: prompt }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.7,
-            max_tokens: 8192
-        });
+        const result = await model.generateContent(
+            `Generate realistic South African BUSINESS bank statement data in valid JSON format only.\n\n${prompt}`
+        );
 
-        const content = completion.choices?.[0]?.message?.content || '{}';
+        const content = result.response.text() || '{}';
         const parsed = parseJSONResponse(content);
         raw.push(parsed);
 

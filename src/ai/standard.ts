@@ -1,11 +1,8 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { formStatementPrompt } from '../handlers/standard/prompt';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 
-/**
- * Generate Standard bank statement data (single statement)
- */
 export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialDataResponse> => {
     const {
         accountHolder,
@@ -17,17 +14,18 @@ export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialD
         salaryAmount,
         physicalAddress,
         companyName,
-        comment
+        comment,
+        referencePdfBase64
     } = data;
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
-        throw new Error('DeepSeek API key not found in database');
+        throw new Error('Gemini API key not found in database');
     }
 
-    const deepseek = new OpenAI({
-        apiKey: keys[0].DEEP_SEEK_API,
-        baseURL: 'https://api.deepseek.com/v1'
+    const genAI = new GoogleGenerativeAI(keys[0].DEEP_SEEK_API);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-3.1-pro-preview',
     });
 
     const systemMessage = 'You are a financial data generator. Generate realistic South African bank statement data in valid JSON format only.';
@@ -45,24 +43,22 @@ export const generateStandardAI = async (data: GenerateDocs): Promise<FinancialD
         comment
     });
 
-    const completion = await deepseek.chat.completions.create({
-        model: 'deepseek-chat',
-        messages: [
-            {
-                role: 'system',
-                content: systemMessage
-            },
-            { role: 'user', content: userMessage }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 8192
-    });
+    const promptText = `${systemMessage}\n\n${userMessage}`;
 
-    const content = completion.choices?.[0]?.message?.content || '{}';
+    // Build parts — attach reference PDF inline if provided (same pattern as financial.ts)
+    const parts: any[] = [];
+    if (referencePdfBase64) {
+        parts.push({
+            inlineData: { mimeType: 'application/pdf', data: referencePdfBase64 }
+        });
+    }
+    parts.push({ text: promptText });
+
+    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+    const content = result.response.text() || '{}';
     let responseData = parseJSONResponse(content);
 
-    // Recalculate balances to ensure they are correct
+    // Recalculate balances
     if (responseData.transactions && Array.isArray(responseData.transactions)) {
         let currentBalance = openBalance;
         responseData.transactions.forEach((tx: any) => {

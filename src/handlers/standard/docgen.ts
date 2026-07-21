@@ -32,6 +32,7 @@ type PayslipRequestBody = {
     comment?: string;
     accountType?: string;
     companyId?: string;
+    referencePdfBase64?: string;
 };
 export const handleDocumentGeneration = async ({
     accountHolder,
@@ -58,10 +59,10 @@ export const handleDocumentGeneration = async ({
     isPayslipIncluded,
     comment,
     accountType,
-    companyId
+    companyId,
+    referencePdfBase64
 }: PayslipRequestBody) => {
     const { paye, uif, net, totalDeductions } = calculatePAYE({ grossSalary: salaryAmount });
-
     // Calculate consistent rent amount
     const rentMin = salaryAmount * 0.15;
     const rentMax = salaryAmount * 0.2;
@@ -198,7 +199,8 @@ export const handleDocumentGeneration = async ({
         companyName,
         comment,
         rentAmount,
-        accountType
+        accountType,
+        referencePdfBase64
     });
     if (financialData.status && financialData.data?.statements) {
         // Pass the original availableBalance to ensure it's respected

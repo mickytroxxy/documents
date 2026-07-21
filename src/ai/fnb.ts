@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 import { fnb_sample_statement, FNBBankStatementType, Transaction } from '../handlers/fnb/sample';
@@ -80,7 +80,8 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
         physicalAddress,
         companyName,
         comment,
-        accountType
+        accountType,
+        referencePdfBase64
     } = data;
 
     // Use a sensible default if physicalAddress was not provided
@@ -88,12 +89,13 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
-        throw new Error('DeepSeek API key not found in database');
+        throw new Error('Gemini API key not found in database');
     }
 
-    const deepseek = new OpenAI({
-        apiKey: keys[0].DEEP_SEEK_API,
-        baseURL: 'https://api.deepseek.com/v1'
+    const genAI = new GoogleGenerativeAI(keys[0].DEEP_SEEK_API);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-3.1-pro-preview',
+        //generationConfig: { responseMimeType: 'application/json', temperature: 0.7, maxOutputTokens: 8192 }
     });
 
     const systemMessage = 'Generate realistic South African FNB bank statement data in valid JSON format only.';
@@ -163,22 +165,19 @@ export const generateFnbAI = async (data: GenerateDocs): Promise<FinancialDataRe
 
         const monthlyUserMessage = formFnbStatementPrompt(monthlyPromptData);
 
-        try {
-            const completion = await deepseek.chat.completions.create({
-                model: 'deepseek-chat',
-                messages: [
-                    {
-                        role: 'system',
-                        content: systemMessage
-                    },
-                    { role: 'user', content: monthlyUserMessage }
-                ],
-                response_format: { type: 'json_object' },
-                temperature: 0.7,
-                max_tokens: 8192
+        // Attach reference PDF inline if provided (same pattern as financial.ts)
+        const parts: any[] = [];
+        if (referencePdfBase64) {
+            parts.push({
+                inlineData: { mimeType: 'application/pdf', data: referencePdfBase64 }
             });
+        }
+        parts.push({ text: `${systemMessage}\n\n${monthlyUserMessage}` });
 
-            const rawContent = completion.choices?.[0]?.message?.content || '{}';
+        try {
+            const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+
+            const rawContent = result.response.text() || '{}';
             const results: any = parseFnbCompletion(rawContent);
             const transactions = Array.isArray(results?.transactions) ? results.transactions : [];
             const address = results?.address || {};

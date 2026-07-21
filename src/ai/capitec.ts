@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecretKeys } from '../helpers/api';
 import { parseJSONResponse, FinancialDataResponse, GenerateDocs } from './shared';
 import { capitec_transactions_sample, CapitecAddressType, CapitecBankStatement, Transaction } from '../handlers/capitec/sample';
@@ -76,7 +76,8 @@ export const generateCapitecAI = async (data: GenerateDocs): Promise<any> => {
         availableBalance,
         salaryAmount,
         physicalAddress,
-        companyName
+        companyName,
+        referencePdfBase64
     } = data;
 
     if (!physicalAddress) {
@@ -85,12 +86,13 @@ export const generateCapitecAI = async (data: GenerateDocs): Promise<any> => {
 
     const keys = await getSecretKeys();
     if (!keys?.length || !keys[0].DEEP_SEEK_API) {
-        throw new Error('DeepSeek API key not found in database');
+        throw new Error('Gemini API key not found in database');
     }
 
-    const deepseek = new OpenAI({
-        apiKey: keys[0].DEEP_SEEK_API,
-        baseURL: 'https://api.deepseek.com/v1'
+    const genAI = new GoogleGenerativeAI(keys[0].DEEP_SEEK_API);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-3.1-pro-preview',
+        //generationConfig: { responseMimeType: 'application/json', temperature: 0.7, maxOutputTokens: 8192 }
     });
 
     const systemMessage = 'Generate realistic South African Capitec bank statement data in valid JSON format only.';
@@ -106,22 +108,20 @@ export const generateCapitecAI = async (data: GenerateDocs): Promise<any> => {
         companyName,
         physicalAddress
     });
-    try {
-        const completion = await deepseek.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                {
-                    role: 'system',
-                    content: systemMessage
-                },
-                { role: 'user', content: userMessage }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.7,
-            max_tokens: 8192
-        });
 
-        const rawContent = completion.choices?.[0]?.message?.content || '{}';
+    // Attach reference PDF inline if provided (same pattern as financial.ts)
+    const parts: any[] = [];
+    if (referencePdfBase64) {
+        parts.push({
+            inlineData: { mimeType: 'application/pdf', data: referencePdfBase64 }
+        });
+    }
+    parts.push({ text: `${systemMessage}\n\n${userMessage}` });
+
+    try {
+        const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+
+        const rawContent = result.response.text() || '{}';
         const results: any = parseCapitecCompletion(rawContent);
         const transactions = Array.isArray(results?.transactions) ? results.transactions : capitec_transactions_sample.transactions;
         const address = results?.address || capitec_transactions_sample.address;

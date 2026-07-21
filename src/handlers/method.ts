@@ -275,6 +275,23 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
         accountType,
         companyId
     } = req.body;
+
+    // Optional reference PDF uploaded for realistic AI context
+    const referencePdfFile = req.files?.referencePdf;
+    let referencePdfBase64: string | undefined;
+    if (referencePdfFile && !Array.isArray(referencePdfFile)) {
+        if (referencePdfFile.mimetype === 'application/pdf') {
+            referencePdfBase64 = referencePdfFile.data.toString('base64');
+        } else {
+            console.warn('[generateDocs] referencePdf must be a PDF — ignoring upload');
+        }
+    }
+    // Convert stringified FormData values back to their correct types
+    const numericSalaryAmount = parseFloat(String(salaryAmount)) || 0;
+    const numericOpenBalance = parseFloat(String(openBalance)) || 0;
+    const numericAvailableBalance = parseFloat(String(availableBalance)) || 0;
+    const booleanIsPayslipIncluded = String(isPayslipIncluded) === 'true';
+
     let months = 1;
     try {
         const userInfo = await authenticateUser(userPhone);
@@ -284,18 +301,19 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
             const cfg = countries.find((c) => c.country_code === (countryCode || 'ZA'));
             const bankPrice = cfg?.documents.find((d) => d.documentType === 'BANK_STATEMENT')?.price || 0;
             const payslipPrice = cfg?.documents.find((d) => d.documentType === 'PAYSLIP')?.price || 0;
-            const serverTotalCost = bankPrice + (isPayslipIncluded ? payslipPrice : 0);
+            const serverTotalCost = bankPrice + (booleanIsPayslipIncluded ? payslipPrice : 0);
 
             if (currentBalance >= serverTotalCost) {
-                months = parseInt(mnth);
+                months = parseInt(String(mnth), 10) || 1;
             }
+
             const response = await handleDocumentGeneration({
                 accountHolder,
                 accountNumber,
                 months,
-                openBalance,
-                availableBalance,
-                salaryAmount,
+                openBalance: numericOpenBalance,
+                availableBalance: numericAvailableBalance,
+                salaryAmount: numericSalaryAmount,
                 payDate,
                 employeeID,
                 paymentMethod,
@@ -311,10 +329,11 @@ export const generateDocs = async (req: Request, res: Response): Promise<void> =
                 title: bankType === 'STANDARD' ? `${title}.` : `${title}`,
                 bankType: bankType?.toUpperCase(),
                 physicalAddress,
-                isPayslipIncluded,
+                isPayslipIncluded: booleanIsPayslipIncluded ? 'true' : 'false',
                 comment,
                 accountType,
-                companyId
+                companyId,
+                referencePdfBase64
             });
             res.status(200).json(response);
             console.log(response, 'final response');

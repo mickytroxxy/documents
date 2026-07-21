@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { StatementData } from '../handlers/standard/types';
 import { TymeBankStatement } from '../handlers/tymebank/sample';
 import { FNBBankStatementType } from '../handlers/fnb/sample';
@@ -21,6 +21,8 @@ export interface GenerateDocs {
     comment?: string;
     rentAmount?: number;
     accountType?: string;
+    /** Optional base64-encoded PDF of the user's real bank statement for reference context */
+    referencePdfBase64?: string;
 }
 
 export interface FinancialDataResponse {
@@ -128,4 +130,4 @@ export const parseJSONResponse = (content: string): any => {
     }
 };
 
-export type DeepSeekClient = OpenAI;
+export type GeminiClient = GoogleGenerativeAI;

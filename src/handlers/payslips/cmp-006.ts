@@ -89,7 +89,8 @@ export const generatePayslip6PDF = async (payslip: PayslipData, index: number, o
         color: COLORS.primary
     });
 
-    const net = `R ${payslip.totals.netPay.toFixed(2)}`;
+    const safeNetPay = typeof payslip.totals.netPay === 'number' ? payslip.totals.netPay : parseFloat(String(payslip.totals.netPay).replace(/,/g, '')) || 0;
+    const net = `R ${safeNetPay.toFixed(2)}`;
     const nw = fontBold.widthOfTextAtSize(net, 16);
 
     page.drawText(net, {
@@ -192,7 +193,8 @@ export const generatePayslip6PDF = async (payslip: PayslipData, index: number, o
             color: COLORS.ink
         });
 
-        const txt = `R ${amount.toFixed(2)}`;
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(String(amount).replace(/,/g, '')) || 0;
+        const txt = `R ${numericAmount.toFixed(2)}`;
         const tw = font.widthOfTextAtSize(txt, 9.5);
 
         page.drawText(txt, {
@@ -230,10 +232,13 @@ export const generatePayslip6PDF = async (payslip: PayslipData, index: number, o
     //
     drawSectionTitle('PAY SUMMARY', y);
 
+    const safeTotalDeductions = typeof payslip.totals.totalDeductions === 'number' ? payslip.totals.totalDeductions : parseFloat(String(payslip.totals.totalDeductions).replace(/,/g, '')) || 0;
+    const netPayFooter = typeof payslip.totals.netPay === 'number' ? payslip.totals.netPay : parseFloat(String(payslip.totals.netPay).replace(/,/g, '')) || 0;
+
     const summaryLines = [
         `Gross Pay: R ${payslip.totals.grossPay}`,
-        `Total Deductions: R ${payslip.totals.totalDeductions.toFixed(2)}`,
-        `Net Pay: R ${payslip.totals.netPay.toFixed(2)}`
+        `Total Deductions: R ${safeTotalDeductions.toFixed(2)}`,
+        `Net Pay: R ${netPayFooter.toFixed(2)}`
     ];
 
     summaryLines.forEach((t, i) => {
