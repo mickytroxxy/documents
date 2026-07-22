@@ -40,6 +40,7 @@ export interface TymeBankStatement {
     bank: string;
     statement_type: string;
     account_holder: string;
+    customer_address?: string | string[];
     account_details: AccountDetails;
     statement_period: StatementPeriod;
     account_type: string;

@@ -143,6 +143,9 @@ export const generateTymebankAI = async (data: GenerateDocs): Promise<FinancialD
             }
 
             if (statementData && typeof statementData === 'object' && Object.keys(statementData).length > 0) {
+                if (!statementData.customer_address && physicalAddress) {
+                    statementData.customer_address = physicalAddress;
+                }
                 statements.push(statementData);
                 currentBalance = statementData.closing_balance || currentBalance;
             }

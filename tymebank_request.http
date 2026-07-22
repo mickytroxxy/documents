@@ -1,0 +1,31 @@
+### Generate TymeBank Statement
+POST http://localhost:1337/api/generateDocs
+Content-Type: application/json
+
+{
+  "accountHolder": "REBECCA KHAMBULA",
+  "accountNumber": "51128758637",
+  "bankType": "TYMEBANK",
+  "title": "MISS",
+  "months": 1,
+  "openBalance": 1500.00,
+  "availableBalance": 4500.00,
+  "salaryAmount": 25000.00,
+  "payDate": "25",
+  "physicalAddress": "45 Main Road, Tembisa, Gauteng, 1632",
+  "companyName": "Tech Solutions Ltd",
+  "companyAddress": "100 Innovation Way, Sandton",
+  "companyEmail": "hr@techsolutions.co.za",
+  "companyTel": "+27110001111",
+  "employeeID": "EMP001",
+  "idNumber": "9501010000080",
+  "taxReference": "9000123456",
+  "department": "Engineering",
+  "bankName": "TymeBank",
+  "branchCode": "678910",
+  "paymentMethod": "Bank Deposit",
+  "isPayslipIncluded": false,
+  "userPhone": "0658016132",
+  "countryCode": "ZA",
+  "accountType": "EveryDay account"
+}

@@ -188,6 +188,7 @@ JSON STRUCTURE (return ONLY valid JSON in this exact structure):
   "bank": "TymeBank",
   "statement_type": "Monthly account statement",
   "account_holder": "${accountHolder}",
+  "customer_address": "${physicalAddress}",
   "account_details": {
     "account_number": "${accountNumber}",
     "branch_code": "678910",

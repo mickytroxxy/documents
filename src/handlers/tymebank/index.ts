@@ -150,6 +150,25 @@ export async function generateTymeBankPDF(
                 color: rgb(0, 0, 0)
             });
 
+            if (data?.customer_address) {
+                const addressLines = Array.isArray(data.customer_address)
+                    ? data.customer_address
+                    : String(data.customer_address)
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+
+                addressLines.forEach((line, idx) => {
+                    currentPage.drawText(line, {
+                        x: 17.9,
+                        y: startY - 72 - idx * 10,
+                        size: 7.5,
+                        font: font,
+                        color: rgb(0, 0, 0)
+                    });
+                });
+            }
+
             currentPage.drawText(`${data?.account_details?.account_number}`, {
                 x: 100,
                 y: startY - 194,
@@ -201,7 +220,7 @@ export async function generateTymeBankPDF(
         // Render table with transactions for this page
         const tableOffsetX = TABLE_CONFIG.leftMargin;
 
-        renderTable({
+        const tableBottomY = renderTable({
             page: currentPage,
             font,
             fontBold,
@@ -221,10 +240,8 @@ export async function generateTymeBankPDF(
 
         // Add legal text only on the very last page AND only when requested by caller
         if (options?.includeLegalText && transactionIndex + pageTransactions.length >= allTransactions.length) {
-            // Calculate position after table - need to calculate based on table height
-            // Estimate table height based on number of transactions
-            const estimatedTableHeight = pageTransactions.length * 17; // Average row height
-            let legalTextY = startY - estimatedTableHeight - 25; // Start below the table
+            // Position legal text 30px after the last row of the transaction table
+            let legalTextY = tableBottomY - 30;
 
             // Add "All fees are inclusive of VAT at 15%" text (aligned with table)
             currentPage.drawText('All fees are inclusive of VAT at 15%', {
@@ -234,8 +251,8 @@ export async function generateTymeBankPDF(
                 color: rgb(0, 0, 0)
             });
 
-            // Add vertical space (reduced to 20px)
-            legalTextY -= 20;
+            // Add vertical space before paragraph
+            legalTextY -= 16;
 
             // Add the final paragraph (aligned with table)
             const finalParagraph =
@@ -535,6 +552,8 @@ function renderTable(options: {
             });
         }
     });
+
+    return currentY;
 }
 
 // Helper function to format amounts with spaces as thousands separators
