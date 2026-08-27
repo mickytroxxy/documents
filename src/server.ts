@@ -30,7 +30,7 @@ app.use(bodyParser.json());
 // Remove default cors() to use our custom handler
 
 export let secrets = {
-    BASE_URL:`https://documents-621707723909.europe-west1.run.app/api`,
+    BASE_URL: `https://documents-production-5e84.up.railway.app/api`,
 
     //BASE_URL: `http://localhost:${server.SERVER_PORT}/api`,
     DEEP_SEEK_API: process.env.DEEP_SEEK_API || 'sk-aee53cdb70a04ea7baa613ddc897ade0',
@@ -102,7 +102,7 @@ export const Main = () => {
         };
         generateIdImage(testIdInfo, 'output.png');
         // psdEditorHandler(testIdInfo);
-        
+
         // Note: generateFinancialStatementFromPdf is now called from the API endpoint
         // when generating business bank statements with financials: { required: true }
         //generateFinancialStatementFromPdf(path.join(__dirname, '.','input.pdf'), '1234567890', 'Empire Digitals', 'Lameck Ndhlovu')
