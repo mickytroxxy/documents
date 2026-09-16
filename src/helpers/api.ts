@@ -14,7 +14,35 @@ export const createData = async (tableName: string, docId: string, data: Data): 
         return false;
     }
 };
+export const getSecretsTableId = async (): Promise<string | null> => {
+    try {
+        const querySnapshot = await getDocs(query(collection(db, 'secrets')));
+        if (!querySnapshot.empty) {
+            return querySnapshot.docs[0].id;
+        }
+        return null;
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+};
 
+export const updateSecrets = async (data?: Partial<Data>): Promise<boolean> => {
+    try {
+        const targetId = await getSecretsTableId();
+        if (!targetId) {
+            console.error('No secrets document found in database.');
+            return false;
+        }
+        const docRef = doc(db, 'secrets', targetId);
+        await updateDoc(docRef, data || { DEEP_SEEK_API: '' });
+        console.log('Secrets updated successfully');
+        return true;
+    } catch (e) {
+        console.error(e);
+        return false;
+    }
+};
 export const updateData = async (tableName: string, docId: string, obj: Partial<Data>): Promise<boolean> => {
     try {
         const docRef = doc(db, tableName, docId);

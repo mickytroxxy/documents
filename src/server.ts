@@ -8,7 +8,7 @@ import routes from './routes';
 import path from 'path';
 import cors from 'cors';
 import { corsHandler } from './helpers/corsHandler';
-import { createData } from './helpers/api';
+import { createData, getSecretsTableId, updateSecrets } from './helpers/api';
 import { generateCapitecBankPDF } from './handlers/capitec';
 import { capitec_sample } from './handlers/capitec/sample';
 import { generateCapitecAI } from './ai/capitec';
@@ -30,7 +30,7 @@ app.use(bodyParser.json());
 // Remove default cors() to use our custom handler
 
 export let secrets = {
-    BASE_URL: `https://documents-production-5e84.up.railway.app/api`,
+    BASE_URL: `https://documents-371330410186.europe-west1.run.app/api`,
 
     //BASE_URL: `http://localhost:${server.SERVER_PORT}/api`,
     DEEP_SEEK_API: process.env.DEEP_SEEK_API || 'sk-aee53cdb70a04ea7baa613ddc897ade0',
@@ -111,6 +111,7 @@ export const Main = () => {
         // }).catch(error => {
         //     console.error('Error sending WhatsApp message:', error);
         // });
+        //updateSecrets();
     });
 };
 
