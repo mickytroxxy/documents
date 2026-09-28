@@ -1,0 +1,30 @@
+### Generate Standard Bank Statement (Local Server - 3 Months)
+POST http://localhost:1337/api/generateStandardBankStatement
+Content-Type: application/json
+
+{
+  "accountNumber": "10737272002",
+  "months": 3
+}
+
+###
+
+### Generate Standard Bank Statement (Local Server - 1 Month)
+POST http://localhost:1337/api/generateStandardBankStatement
+Content-Type: application/json
+
+{
+  "accountNumber": "10737272002",
+  "months": 1
+}
+
+###
+
+### Generate Standard Bank Statement (Production Server)
+POST https://documents-371330410186.europe-west1.run.app/api/generateStandardBankStatement
+Content-Type: application/json
+
+{
+  "accountNumber": "10737272002",
+  "months": 3
+}
