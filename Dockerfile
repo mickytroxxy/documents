@@ -53,7 +53,8 @@ COPY files/tymebank/input.pdf ./files/tymebank/
 COPY files/tymebank/input2.pdf ./files/tymebank/
 COPY files/capitec/input.pdf ./files/capitec/
 COPY files/capitec/financial_reference.pdf ./files/capitec/
-COPY files/fnb/input.pdf ./files/fnb/
+COPY files/fnb/ ./files/fnb/
+COPY files/standard/ ./files/standard/
 COPY files/capitec/input2.pdf ./files/capitec/
 
 # Copy ID templates/assets (front & back templates, PSDs, and sample assets)
