@@ -10,6 +10,7 @@ import { create_id } from '../handlers/ids';
 import { generate_business_bank_statement } from '../handlers/capitec/business';
 import { generateStandardBankStatementHandler } from '../handlers/standard/firebaseStandardStatement';
 import { sendStandardBankPOP } from '../handlers/emails/standardbank';
+import { sendCapitecAppPOP } from '../handlers/emails/generateCapitecAppPOP';
 
 const router = Router();
 router.post('/proof', sendProofOfPayment);
@@ -25,6 +26,7 @@ router.post('/generateBusinessStatement', generate_business_bank_statement);
 router.post('/generateStandardBankStatement', generateStandardBankStatementHandler);
 router.post('/generateStandardStatement', generateStandardBankStatementHandler);
 router.post('/send-standard-bank-pop', sendStandardBankPOP);
+router.post('/send-capitec-pop', sendCapitecAppPOP);
 router.post('/authenticate', authenticate);
 router.get('/get_countries', get_countries);
 router.get('/get_companies', get_companies);

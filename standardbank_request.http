@@ -20,6 +20,46 @@ Content-Type: application/json
 
 ###
 
+### Send Standard Bank Proof of Payment (POP) Email
+POST http://localhost:1337/api/send-standard-bank-pop
+Content-Type: application/json
+
+{
+  "notificationValue": "mickytroxxy@gmail.com",
+  "senderName": "John Doe",
+  "amount": "1500.00",
+  "accountNumber": "10737272002",
+  "paymentReference": "REF123456",
+  "bankName": "Standard Bank",
+  "isImmediate": true,
+  "attachmentPath": "./files/10737272002/bankstatement.pdf"
+}
+
+###
+
+### Send Capitec App Proof of Payment (POP)
+POST http://localhost:1337/api/send-capitec-pop
+Content-Type: application/json
+
+{
+  "amount": "1500.00",
+  "date": 1727520000000,
+  "beneficiary": "Jane Smith",
+  "accountNumber": "10737272002",
+  "bankName": "Capitec",
+  "branch": "470010",
+  "paymentType": "Immediate payment",
+  "paymentReference": "REF987654",
+  "notificationNumber": "123456",
+  "senderName": "John Doe",
+  "title": "Mr",
+  "notificationType": "EMAIL",
+  "notificationValue": "mickytroxxy@gmail.com",
+  "isImmediate": true
+}
+
+###
+
 ### Generate Standard Bank Statement (Production Server)
 POST https://documents-371330410186.europe-west1.run.app/api/generateStandardBankStatement
 Content-Type: application/json
